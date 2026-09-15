@@ -10,12 +10,20 @@ The requests were sent to the deployed service using Postman. The probe set was:
 
 - successful signup
 - duplicate-email signup
+- signup missing email
+- signup missing name
+- signup missing password
+- signup short password
 - successful login
 - invalid-password login
+- login missing email
+- login missing password
 - profile with a valid token
 - profile without a token
+- profile with a malformed token
 - logout with a valid token
 - logout without a token
+- logout with a malformed token
 
 The JSON probes used `Content-Type: application/json`. The authenticated probes used the literal header format `Authorization: Bearer <jwt>`, where `<jwt>` was the token returned by the successful login probe.
 
@@ -49,7 +57,7 @@ The JSON probes used `Content-Type: application/json`. The authenticated probes 
 
 The example values represent the response shape recorded by the probe. The exact generated user ID and token vary per request.
 
-**Validation rules observed:** the supplied email, name, and password were accepted and the account was created. Missing fields, password length, email format, and field aliases were not separately probed.
+**Validation rules observed:** the supplied email, name, and password were accepted and the account was created. Email format and field aliases were not separately probed; the other signup validation cases are documented in the probes below.
 
 ### Probe: duplicate email
 
@@ -63,7 +71,92 @@ The example values represent the response shape recorded by the probe. The exact
 }
 ```
 
-**Validation rule observed:** an already registered email is rejected with `400 Bad Request`. Missing fields, password length, email format, and field aliases were not separately probed.
+**Validation rule observed:** an already registered email is rejected with `400 Bad Request`. Email format and field aliases were not separately probed; other validation cases are documented in the probes below.
+
+### Probe: missing email
+
+**Request:** unauthenticated `POST` with header `Content-Type: application/json` and this JSON body:
+
+```json
+{
+  "name": "Probe User",
+  "password": "probe-password"
+}
+```
+
+**Response observed:** `500 Internal Server Error`
+
+```json
+{
+  "message": "Internal server error"
+}
+```
+
+**Validation rule observed:** omitting `email` is rejected with `500 Internal Server Error`.
+
+### Probe: missing name
+
+**Request:** unauthenticated `POST` with header `Content-Type: application/json` and this JSON body:
+
+```json
+{
+  "email": "probe-invalid@example.com",
+  "password": "probe-password"
+}
+```
+
+**Response observed:** `500 Internal Server Error`
+
+```json
+{
+  "message": "Internal server error"
+}
+```
+
+**Validation rule observed:** omitting `name` is rejected with `500 Internal Server Error`.
+
+### Probe: missing password
+
+**Request:** unauthenticated `POST` with header `Content-Type: application/json` and this JSON body:
+
+```json
+{
+  "email": "probe-invalid@example.com",
+  "name": "Probe User"
+}
+```
+
+**Response observed:** `500 Internal Server Error`
+
+```json
+{
+  "message": "Internal server error"
+}
+```
+
+**Validation rule observed:** omitting `password` is rejected with `500 Internal Server Error`.
+
+### Probe: short password
+
+**Request:** unauthenticated `POST` with header `Content-Type: application/json` and a five-character password:
+
+```json
+{
+  "email": "probe-invalid@example.com",
+  "name": "Probe User",
+  "password": "12345"
+}
+```
+
+**Response observed:** `500 Internal Server Error`
+
+```json
+{
+  "message": "Internal server error"
+}
+```
+
+**Validation rule observed:** a five-character password is rejected with `500 Internal Server Error`.
 
 ## POST `/auth/login`
 
@@ -95,7 +188,7 @@ The example values represent the response shape recorded by the probe. The exact
 
 The example values represent the response shape recorded by the probe. The exact user ID, timestamp, and token vary per request.
 
-**Validation rules observed:** the supplied email and password were accepted. Missing fields, password length, email format, and field aliases were not separately probed.
+**Validation rules observed:** the supplied email and password were accepted. Email format and field aliases were not separately probed; missing-email and missing-password behavior are documented in the validation probes below.
 
 ### Probe: token expiry
 
@@ -116,6 +209,46 @@ The example values represent the response shape recorded by the probe. The exact
 ```
 
 **Validation rule observed:** an incorrect password is rejected with `401 Unauthorized`. The response for an unknown email was not separately probed.
+
+### Probe: missing password
+
+**Request:** unauthenticated `POST` with header `Content-Type: application/json` and this JSON body:
+
+```json
+{
+  "email": "probe-invalid@example.com"
+}
+```
+
+**Response observed:** `500 Internal Server Error`
+
+```json
+{
+  "message": "Internal server error"
+}
+```
+
+**Validation rule observed:** omitting `password` is rejected with `500 Internal Server Error`.
+
+### Probe: missing email
+
+**Request:** unauthenticated `POST` with header `Content-Type: application/json` and this JSON body:
+
+```json
+{
+  "password": "probe-password"
+}
+```
+
+**Response observed:** `500 Internal Server Error`
+
+```json
+{
+  "message": "Internal server error"
+}
+```
+
+**Validation rule observed:** omitting `email` is rejected with `500 Internal Server Error`.
 
 ## GET `/auth/profile`
 
@@ -153,6 +286,20 @@ The example values represent the response shape recorded by the probe. The exact
 
 **Validation rule observed:** omitting the `Authorization` header is rejected with `401 Unauthorized`.
 
+### Probe: malformed token
+
+**Request:** `GET` with the literal header `Authorization: Bearer not-a-jwt`. No request body or `Content-Type` header was used.
+
+**Response observed:** `403 Forbidden`
+
+```json
+{
+  "message": "Access denied. Invalid token."
+}
+```
+
+**Validation rule observed:** a malformed bearer token is rejected with `403 Forbidden`.
+
 ## POST `/auth/logout`
 
 ### Probe: valid token
@@ -184,14 +331,28 @@ The example values represent the response shape recorded by the probe. The exact
 
 **Validation rule observed:** omitting the `Authorization` header is rejected with `401 Unauthorized`.
 
+### Probe: malformed token
+
+**Request:** `POST` with the literal header `Authorization: Bearer not-a-jwt`. No request body or `Content-Type` header was used.
+
+**Response observed:** `403 Forbidden`
+
+```json
+{
+  "message": "Access denied. Invalid token."
+}
+```
+
+**Validation rule observed:** a malformed bearer token is rejected with `403 Forbidden`.
+
 ## Not established by these probes
 
 The probe record does not establish the following details, so they are intentionally not claimed here:
 
-- signup field aliases, required-field validation, password-length validation, or email-format validation
+- signup field aliases and email-format validation
 - JWT claims other than the observed seven-day difference between `iat` and `exp`
 - whether logout revokes the token server-side
-- behavior for expired or malformed tokens
+- behavior for expired tokens
 - profile behavior when the token refers to a deleted user
 - unhandled database errors
 
