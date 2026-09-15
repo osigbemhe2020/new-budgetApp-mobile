@@ -19,6 +19,8 @@ The requests were sent to the deployed service using Postman. The probe set was:
 - signup six-character password
 - signup seven-character password
 - signup eight-character password
+- signup nine-character password
+- signup ten-character password
 - successful login
 - invalid-password login
 - login missing email
@@ -43,7 +45,7 @@ The JSON probes used `Content-Type: application/json`. The authenticated probes 
 {
   "email": "person@example.com",
   "name": "Example Person",
-  "password": "at-least-6-chars"
+  "password": "xxxxxxxxx"
 }
 ```
 
@@ -63,7 +65,7 @@ The JSON probes used `Content-Type: application/json`. The authenticated probes 
 
 The example values represent the response shape recorded by the probe. The exact generated user ID and token vary per request.
 
-**Validation rules observed:** the supplied email, name, and password were accepted and the account was created. Field aliases were not separately probed; the other signup validation cases are documented in the probes below.
+**Validation rules observed:** the supplied email, name, and nine-character password were accepted and the account was created. Field aliases were not separately probed; the other signup validation cases are documented in the probes below.
 
 ### Probe: duplicate email
 
@@ -77,7 +79,7 @@ The example values represent the response shape recorded by the probe. The exact
 }
 ```
 
-**Validation rule observed:** an already registered email is rejected with `400 Bad Request`. Email format and field aliases were not separately probed; other validation cases are documented in the probes below.
+**Validation rule observed:** an already registered email is rejected with `400 Bad Request`. Field aliases were not separately probed; other validation cases are documented in the probes below.
 
 ### Probe: missing email
 
@@ -229,6 +231,56 @@ The example values represent the response shape recorded by the probe. The exact
 ```
 
 **Validation rule observed:** an eight-character password was not accepted by this probe. The response does not establish whether eight characters is below the minimum or whether another signup failure caused the `500` response.
+
+### Probe: nine-character password
+
+**Request:** unauthenticated `POST` with header `Content-Type: application/json` and a nine-character password:
+
+```json
+{
+  "email": "probe-boundary-9-973798262@example.com",
+  "name": "Probe User",
+  "password": "xxxxxxxxx"
+}
+```
+
+**Response observed:** `201 Created`
+
+```json
+{
+  "message": "User added successfully",
+  "user": {
+    "UserID": 11,
+    "FullName": "Probe User",
+    "Email": "probe-boundary-9-973798262@example.com"
+  },
+  "token": "<jwt>"
+}
+```
+
+**Validation rule observed:** a nine-character password was accepted by this probe.
+
+### Probe: ten-character password
+
+**Request:** unauthenticated `POST` with header `Content-Type: application/json` and a ten-character password:
+
+```json
+{
+  "email": "probe-boundary-10-unique@example.com",
+  "name": "Probe User",
+  "password": "xxxxxxxxxx"
+}
+```
+
+**Response observed:** `500 Internal Server Error`
+
+```json
+{
+  "message": "Internal server error"
+}
+```
+
+**Validation rule observed:** a ten-character password was not accepted by this probe.
 
 ### Probe: invalid email format
 
@@ -386,7 +438,7 @@ The example values represent the response shape recorded by the probe. The exact
 }
 ```
 
-**Validation rule observed:** the token supplied as `Authorization: Bearer <jwt>` was accepted. Expired-token handling was not separately probed. The malformed-token result is documented in the following probe, and the seven-day expiry observation is documented under the login probe.
+**Validation rule observed:** the token supplied as `Authorization: Bearer <jwt>` was accepted. Expired-token handling was not separately probed. The malformed-token result is documented under **Probe: malformed token** below, and the seven-day expiry observation is documented under the login probe.
 
 ### Probe: missing token
 
@@ -465,7 +517,8 @@ The example values represent the response shape recorded by the probe. The exact
 
 The probe record does not establish the following details, so they are intentionally not claimed here:
 
-- signup field aliases and the cause of the `500` response for invalid-format email and six-character password
+- signup field aliases and the cause of the generic `500` responses for invalid-format email and password lengths other than the accepted nine-character probe
+- an exact password minimum; the probes establish that nine characters was accepted, while five through eight and ten through fifteen returned `500`
 - JWT claims other than the observed seven-day difference between `iat` and `exp`
 - whether logout revokes the token server-side
 - behavior for expired tokens
