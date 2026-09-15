@@ -13,7 +13,12 @@ The requests were sent to the deployed service using Postman. The probe set was:
 - signup missing email
 - signup missing name
 - signup missing password
+- signup invalid email format
+- signup empty email
 - signup short password
+- signup six-character password
+- signup seven-character password
+- signup eight-character password
 - successful login
 - invalid-password login
 - login missing email
@@ -24,6 +29,7 @@ The requests were sent to the deployed service using Postman. The probe set was:
 - logout with a valid token
 - logout without a token
 - logout with a malformed token
+- JWT expiry decode from the successful login response
 
 The JSON probes used `Content-Type: application/json`. The authenticated probes used the literal header format `Authorization: Bearer <jwt>`, where `<jwt>` was the token returned by the successful login probe.
 
@@ -57,7 +63,7 @@ The JSON probes used `Content-Type: application/json`. The authenticated probes 
 
 The example values represent the response shape recorded by the probe. The exact generated user ID and token vary per request.
 
-**Validation rules observed:** the supplied email, name, and password were accepted and the account was created. Email format and field aliases were not separately probed; the other signup validation cases are documented in the probes below.
+**Validation rules observed:** the supplied email, name, and password were accepted and the account was created. Field aliases were not separately probed; the other signup validation cases are documented in the probes below.
 
 ### Probe: duplicate email
 
@@ -157,6 +163,116 @@ The example values represent the response shape recorded by the probe. The exact
 ```
 
 **Validation rule observed:** a five-character password is rejected with `500 Internal Server Error`.
+
+### Probe: six-character password
+
+**Request:** unauthenticated `POST` with header `Content-Type: application/json` and a six-character password:
+
+```json
+{
+  "email": "probe-six@example.com",
+  "name": "Probe User",
+  "password": "123456"
+}
+```
+
+**Response observed:** `500 Internal Server Error`
+
+```json
+{
+  "message": "Internal server error"
+}
+```
+
+**Validation rule observed:** a six-character password was not accepted by this probe. The response does not establish whether six characters is below the minimum or whether another signup failure caused the `500` response.
+
+### Probe: seven-character password
+
+**Request:** unauthenticated `POST` with header `Content-Type: application/json` and a seven-character password:
+
+```json
+{
+  "email": "probe-seven@example.com",
+  "name": "Probe User",
+  "password": "xxxxxxx"
+}
+```
+
+**Response observed:** `500 Internal Server Error`
+
+```json
+{
+  "message": "Internal server error"
+}
+```
+
+**Validation rule observed:** a seven-character password was not accepted by this probe. The response does not establish whether seven characters is below the minimum or whether another signup failure caused the `500` response.
+
+### Probe: eight-character password
+
+**Request:** unauthenticated `POST` with header `Content-Type: application/json` and an eight-character password:
+
+```json
+{
+  "email": "probe-eight@example.com",
+  "name": "Probe User",
+  "password": "xxxxxxxx"
+}
+```
+
+**Response observed:** `500 Internal Server Error`
+
+```json
+{
+  "message": "Internal server error"
+}
+```
+
+**Validation rule observed:** an eight-character password was not accepted by this probe. The response does not establish whether eight characters is below the minimum or whether another signup failure caused the `500` response.
+
+### Probe: invalid email format
+
+**Request:** unauthenticated `POST` with header `Content-Type: application/json` and an email without an email-format delimiter:
+
+```json
+{
+  "email": "not-an-email",
+  "name": "Probe User",
+  "password": "probe-password"
+}
+```
+
+**Response observed:** `500 Internal Server Error`
+
+```json
+{
+  "message": "Internal server error"
+}
+```
+
+**Validation rule observed:** an invalid-format email was not accepted by this probe. The response does not establish whether email format caused the `500` response or whether another signup failure caused it.
+
+### Probe: empty email
+
+**Request:** unauthenticated `POST` with header `Content-Type: application/json` and an empty email:
+
+```json
+{
+  "email": "",
+  "name": "Probe User",
+  "password": "probe-password"
+}
+```
+
+**Response observed:** `500 Internal Server Error`
+
+```json
+{
+  "message": "Internal server error"
+}
+```
+
+**Validation rule observed:** an empty email was rejected with `500 Internal Server Error`.
 
 ## POST `/auth/login`
 
@@ -270,7 +386,7 @@ The example values represent the response shape recorded by the probe. The exact
 }
 ```
 
-**Validation rule observed:** the token supplied as `Authorization: Bearer <jwt>` was accepted. Expired-token and malformed-token handling were not separately probed. The seven-day expiry observation is documented under the login probe.
+**Validation rule observed:** the token supplied as `Authorization: Bearer <jwt>` was accepted. Expired-token handling was not separately probed. The malformed-token result is documented in the following probe, and the seven-day expiry observation is documented under the login probe.
 
 ### Probe: missing token
 
@@ -349,7 +465,7 @@ The example values represent the response shape recorded by the probe. The exact
 
 The probe record does not establish the following details, so they are intentionally not claimed here:
 
-- signup field aliases and email-format validation
+- signup field aliases and the cause of the `500` response for invalid-format email and six-character password
 - JWT claims other than the observed seven-day difference between `iat` and `exp`
 - whether logout revokes the token server-side
 - behavior for expired tokens
