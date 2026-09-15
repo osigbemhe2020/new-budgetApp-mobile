@@ -17,7 +17,7 @@ The requests were sent to the deployed service using Postman. The probe set was:
 - logout with a valid token
 - logout without a token
 
-The JSON probes used `Content-Type: application/json`. The authenticated probes used an `Authorization` header containing the token returned by the successful login probe. The exact accepted token prefix was not separately probed.
+The JSON probes used `Content-Type: application/json`. The authenticated probes used the literal header format `Authorization: Bearer <jwt>`, where `<jwt>` was the token returned by the successful login probe.
 
 ## POST `/auth/signup`
 
@@ -49,7 +49,7 @@ The JSON probes used `Content-Type: application/json`. The authenticated probes 
 
 The example values represent the response shape recorded by the probe. The exact generated user ID and token vary per request.
 
-**Validation observed:** the supplied signup data was accepted and created an account. Required-field, password-length, email-format, and field-alias validation were not separately probed.
+**Validation rules observed:** the supplied email, name, and password were accepted and the account was created. Missing fields, password length, email format, and field aliases were not separately probed.
 
 ### Probe: duplicate email
 
@@ -63,7 +63,7 @@ The example values represent the response shape recorded by the probe. The exact
 }
 ```
 
-**Validation observed:** an already registered email is rejected with `400 Bad Request`. Other signup validation rules were not established by this probe.
+**Validation rule observed:** an already registered email is rejected with `400 Bad Request`. Missing fields, password length, email format, and field aliases were not separately probed.
 
 ## POST `/auth/login`
 
@@ -95,7 +95,7 @@ The example values represent the response shape recorded by the probe. The exact
 
 The example values represent the response shape recorded by the probe. The exact user ID, timestamp, and token vary per request.
 
-**Validation observed:** the supplied email and password were accepted. Required-field, password-length, email-format, and field-alias validation were not separately probed.
+**Validation rules observed:** the supplied email and password were accepted. Missing fields, password length, email format, and field aliases were not separately probed.
 
 ### Probe: token expiry
 
@@ -115,13 +115,13 @@ The example values represent the response shape recorded by the probe. The exact
 }
 ```
 
-**Validation observed:** an incorrect password is rejected with `401 Unauthorized`. The response for an unknown email was not separately probed.
+**Validation rule observed:** an incorrect password is rejected with `401 Unauthorized`. The response for an unknown email was not separately probed.
 
 ## GET `/auth/profile`
 
 ### Probe: valid token
 
-**Request:** `GET` with an `Authorization` header containing the token returned by the successful login probe. No request body or `Content-Type` header was used.
+**Request:** `GET` with the literal header `Authorization: Bearer <jwt>`, where `<jwt>` was the token returned by the successful login probe. No request body or `Content-Type` header was used.
 
 **Response observed:** `200 OK`
 
@@ -137,7 +137,7 @@ The example values represent the response shape recorded by the probe. The exact
 }
 ```
 
-**Validation observed:** the token from the successful login probe was accepted. Token expiry, malformed-token handling, and token-prefix requirements were not separately probed.
+**Validation rule observed:** the token supplied as `Authorization: Bearer <jwt>` was accepted. Expired-token and malformed-token handling were not separately probed. The seven-day expiry observation is documented under the login probe.
 
 ### Probe: missing token
 
@@ -151,13 +151,13 @@ The example values represent the response shape recorded by the probe. The exact
 }
 ```
 
-**Validation observed:** omitting the `Authorization` header is rejected with `401 Unauthorized`.
+**Validation rule observed:** omitting the `Authorization` header is rejected with `401 Unauthorized`.
 
 ## POST `/auth/logout`
 
 ### Probe: valid token
 
-**Request:** `POST` with an `Authorization` header containing the token returned by the successful login probe. No request body or `Content-Type` header was used.
+**Request:** `POST` with the literal header `Authorization: Bearer <jwt>`, where `<jwt>` was the token returned by the successful login probe. No request body or `Content-Type` header was used.
 
 **Response observed:** `200 OK`
 
@@ -168,7 +168,7 @@ The example values represent the response shape recorded by the probe. The exact
 }
 ```
 
-**Validation observed:** the token from the successful login probe was accepted. Whether logout revokes the token server-side was not probed.
+**Validation rule observed:** the token supplied as `Authorization: Bearer <jwt>` was accepted. Whether logout revokes the token server-side was not probed.
 
 ### Probe: missing token
 
@@ -182,15 +182,14 @@ The example values represent the response shape recorded by the probe. The exact
 }
 ```
 
-**Validation observed:** omitting the `Authorization` header is rejected with `401 Unauthorized`.
+**Validation rule observed:** omitting the `Authorization` header is rejected with `401 Unauthorized`.
 
 ## Not established by these probes
 
 The probe record does not establish the following details, so they are intentionally not claimed here:
 
 - signup field aliases, required-field validation, password-length validation, or email-format validation
-- the exact token expiry or JWT claims
-- whether the token must use the `Bearer` prefix or may be sent raw
+- JWT claims other than the observed seven-day difference between `iat` and `exp`
 - whether logout revokes the token server-side
 - behavior for expired or malformed tokens
 - profile behavior when the token refers to a deleted user
