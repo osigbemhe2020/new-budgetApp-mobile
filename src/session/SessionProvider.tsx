@@ -7,8 +7,9 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-//import * as SecureStore from 'expo-secure-store';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
+import * as SplashScreen from 'expo-splash-screen';
+import { jwtDecode } from 'jwt-decode';
 
 export type SessionUser = {
   UserID: number | string;
@@ -28,26 +29,36 @@ type SessionContextValue = {
   status: SessionStatus;
   session: SessionData | null;
   isReady: boolean;
-  signIn: (token: string, user?: SessionUser | null, expiresAt?: number) => Promise<void>;
+  signIn: (token: string, user?: SessionUser | null) => Promise<void>;
   signOut: () => Promise<void>;
 };
 
 const SESSION_KEY = 'budgetapp-session';
 const DEFAULT_SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
-
-
-// async function clearStoredSession() {
-//   await SecureStore.deleteItemAsync(SESSION_KEY);
-// }
+const API_BASE_URL = 'https://site--new-budgetapp-backend--vl2lrdxwsxyp.code.run';
 
 async function clearStoredSession() {
-  await AsyncStorage.removeItem(SESSION_KEY);
+  await SecureStore.deleteItemAsync(SESSION_KEY);
 }
 
+// Per the auth contract's Token table, the JWT's exp claim is the only
+// server-issued expiry on record (iat/exp differ by 7 days on the probed
+// token). Decoding it directly replaces the client's invented duration.
+function decodeTokenExpiry(token: string): number | null {
+  try {
+    const decoded = jwtDecode<{ exp?: number }>(token);
+    if (typeof decoded.exp !== 'number' || !Number.isFinite(decoded.exp)) {
+      return null;
+    }
+    return decoded.exp * 1000;
+  } catch {
+    return null;
+  }
+}
 
 async function readStoredSession(): Promise<SessionData | null> {
-  //const raw = await SecureStore.getItemAsync(SESSION_KEY);
-  const raw = await AsyncStorage.getItem(SESSION_KEY);
+  const raw = await SecureStore.getItemAsync(SESSION_KEY);
+
   if (!raw) {
     return null;
   }
@@ -60,6 +71,9 @@ async function readStoredSession(): Promise<SessionData | null> {
       return null;
     }
 
+    // First gate: local shape + clock check. Cheap, avoids a network
+    // round trip for the obviously-expired case. Not sufficient alone —
+    // see checkSessionWithServer, the second gate, below.
     if (parsed.expiresAt <= Date.now()) {
       await clearStoredSession();
       return null;
@@ -76,6 +90,35 @@ async function readStoredSession(): Promise<SessionData | null> {
   }
 }
 
+type ProfileCheckResult =
+  | { outcome: 'valid'; user: SessionUser | null }
+  | { outcome: 'invalid' }
+  | { outcome: 'unreachable' };
+
+// Second gate: GET /auth/profile per the auth contract. 200 = token still
+// good server-side. 401 ("no token") and 403 ("invalid token") are the
+// only non-2xx statuses the contract establishes, but any non-2xx is
+// treated as a rejection, since revoked/deleted-user/expired-token
+// behavior isn't documented and shouldn't be assumed to be 200.
+// A request that never completes (no network, timeout) is deliberately
+// kept separate as 'unreachable' — see the fail-open branch below.
+async function checkSessionWithServer(token: string): Promise<ProfileCheckResult> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/auth/profile`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (!response.ok) {
+      return { outcome: 'invalid' };
+    }
+
+    const body = await response.json();
+    return { outcome: 'valid', user: body?.user ?? null };
+  } catch {
+    return { outcome: 'unreachable' };
+  }
+}
+
 const SessionContext = createContext<SessionContextValue | undefined>(undefined);
 
 export function SessionProvider({ children }: { children: ReactNode }) {
@@ -89,19 +132,46 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       try {
         const storedSession = await readStoredSession();
 
-        if (!active) {
+        if (!active) return;
+
+        if (!storedSession) {
+          setSession(null);
+          setStatus('unauthenticated');
           return;
         }
 
-        setSession(storedSession);
-        setStatus(storedSession ? 'authenticated' : 'unauthenticated');
-      } catch {
-        if (!active) {
+        const check = await checkSessionWithServer(storedSession.token);
+
+        if (!active) return;
+
+        if (check.outcome === 'invalid') {
+          await clearStoredSession();
+          setSession(null);
+          setStatus('unauthenticated');
           return;
         }
+
+        if (check.outcome === 'valid') {
+          // Server confirmed the token; refresh the cached user in case
+          // it's changed since sign-in.
+          setSession({ ...storedSession, user: check.user ?? storedSession.user });
+          setStatus('authenticated');
+          return;
+        }
+
+        // outcome === 'unreachable': product decision — fail open, trust
+        // the locally-valid token so the app still works offline.
+        setSession(storedSession);
+        setStatus('authenticated');
+      } catch {
+        if (!active) return;
 
         setSession(null);
         setStatus('unauthenticated');
+      } finally {
+        if (active) {
+          await SplashScreen.hideAsync();
+        }
       }
     };
 
@@ -112,24 +182,22 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const signIn = useCallback(async (token: string, user?: SessionUser | null, expiresAt?: number) => {
+  const signIn = useCallback(async (token: string, user?: SessionUser | null) => {
     if (!token) {
       throw new Error('A session token is required.');
     }
 
-    const computedExpiresAt =
-      typeof expiresAt === 'number' && Number.isFinite(expiresAt)
-        ? expiresAt
-        : Date.now() + DEFAULT_SESSION_DURATION_MS;
+    const decodedExpiresAt = decodeTokenExpiry(token);
+    const expiresAt = decodedExpiresAt ?? Date.now() + DEFAULT_SESSION_DURATION_MS;
 
     const nextSession: SessionData = {
       token,
       user: user ?? null,
-      expiresAt: computedExpiresAt,
+      expiresAt,
     };
 
-    //await SecureStore.setItemAsync(SESSION_KEY, JSON.stringify(nextSession));
-    await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(nextSession));
+    await SecureStore.setItemAsync(SESSION_KEY, JSON.stringify(nextSession));
+
     setSession(nextSession);
     setStatus('authenticated');
   }, []);
