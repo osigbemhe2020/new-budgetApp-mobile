@@ -100,12 +100,25 @@ type ProfileCheckResult =
 // only non-2xx statuses the contract establishes, but any non-2xx is
 // treated as a rejection, since revoked/deleted-user/expired-token
 // behavior isn't documented and shouldn't be assumed to be 200.
-// A request that never completes (no network, timeout) is deliberately
-// kept separate as 'unreachable' — see the fail-open branch below.
+//
+// A request that never settles (no network, black-holed connection) is
+// bounded with an AbortController timeout below, so it always resolves
+// to 'unreachable' rather than hanging bootstrapSession indefinitely.
+//
+// Per AC04 ("an expired or invalid session lands on login... never the
+// dashboard"), 'unreachable' is NOT treated as valid — an unconfirmed
+// session is not a confirmed session. See bootstrapSession: 'invalid'
+// and 'unreachable' both clear storage and route to login.
+const PROFILE_CHECK_TIMEOUT_MS = 8000;
+
 async function checkSessionWithServer(token: string): Promise<ProfileCheckResult> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), PROFILE_CHECK_TIMEOUT_MS);
+
   try {
     const response = await fetch(`${API_BASE_URL}/auth/profile`, {
       headers: { Authorization: `Bearer ${token}` },
+      signal: controller.signal,
     });
 
     if (!response.ok) {
@@ -115,7 +128,12 @@ async function checkSessionWithServer(token: string): Promise<ProfileCheckResult
     const body = await response.json();
     return { outcome: 'valid', user: body?.user ?? null };
   } catch {
+    // Covers both a real network failure and an aborted (timed-out) request —
+    // AbortController rejects the fetch promise with an AbortError, which
+    // lands here indistinguishably from a DNS/connection failure.
     return { outcome: 'unreachable' };
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 
@@ -144,13 +162,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
         if (!active) return;
 
-        if (check.outcome === 'invalid') {
-          await clearStoredSession();
-          setSession(null);
-          setStatus('unauthenticated');
-          return;
-        }
-
         if (check.outcome === 'valid') {
           // Server confirmed the token; refresh the cached user in case
           // it's changed since sign-in.
@@ -159,10 +170,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        // outcome === 'unreachable': product decision — fail open, trust
-        // the locally-valid token so the app still works offline.
-        setSession(storedSession);
-        setStatus('authenticated');
+        // 'invalid' (server actively rejected: 401/403/etc.) and
+        // 'unreachable' (couldn't confirm at all — timeout, no network,
+        // DNS failure) are both treated as "not a confirmed valid
+        // session." Per AC04, the dashboard is never shown for a session
+        // that wasn't actively confirmed — no carve-out for network
+        // failure. An earlier fail-open policy for 'unreachable' was
+        // reverted because it contradicted this criterion as written.
+        await clearStoredSession();
+        setSession(null);
+        setStatus('unauthenticated');
       } catch {
         if (!active) return;
 
