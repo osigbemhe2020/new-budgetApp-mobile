@@ -7,7 +7,8 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import * as SecureStore from 'expo-secure-store';
+//import * as SecureStore from 'expo-secure-store';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export type SessionUser = {
   UserID: number | string;
@@ -34,13 +35,19 @@ type SessionContextValue = {
 const SESSION_KEY = 'budgetapp-session';
 const DEFAULT_SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
 
+
+// async function clearStoredSession() {
+//   await SecureStore.deleteItemAsync(SESSION_KEY);
+// }
+
 async function clearStoredSession() {
-  await SecureStore.deleteItemAsync(SESSION_KEY);
+  await AsyncStorage.removeItem(SESSION_KEY);
 }
 
-async function readStoredSession(): Promise<SessionData | null> {
-  const raw = await SecureStore.getItemAsync(SESSION_KEY);
 
+async function readStoredSession(): Promise<SessionData | null> {
+  //const raw = await SecureStore.getItemAsync(SESSION_KEY);
+  const raw = await AsyncStorage.getItem(SESSION_KEY);
   if (!raw) {
     return null;
   }
@@ -121,7 +128,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       expiresAt: computedExpiresAt,
     };
 
-    await SecureStore.setItemAsync(SESSION_KEY, JSON.stringify(nextSession));
+    //await SecureStore.setItemAsync(SESSION_KEY, JSON.stringify(nextSession));
+    await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(nextSession));
     setSession(nextSession);
     setStatus('authenticated');
   }, []);
