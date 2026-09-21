@@ -158,7 +158,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        const check = await checkSessionWithServer(storedSession.token);
+      const check = await checkSessionWithServer(storedSession.token);
 
         if (!active) return;
 
@@ -170,14 +170,24 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        // 'invalid' (server actively rejected: 401/403/etc.) and
-        // 'unreachable' (couldn't confirm at all — timeout, no network,
-        // DNS failure) are both treated as "not a confirmed valid
-        // session." Per AC04, the dashboard is never shown for a session
-        // that wasn't actively confirmed — no carve-out for network
-        // failure. An earlier fail-open policy for 'unreachable' was
-        // reverted because it contradicted this criterion as written.
-        await clearStoredSession();
+        if (check.outcome === 'invalid') {
+          // Server actively rejected the token (401/403/etc.) — confirmed
+          // expired or invalid. AC04 requires clearing storage here.
+          await clearStoredSession();
+          setSession(null);
+          setStatus('unauthenticated');
+          return;
+        }
+
+        // check.outcome === 'unreachable': the server never confirmed OR
+        // rejected the token — this is not the same case AC04 covers.
+        // Show login (no confirmed-valid session, so no dashboard), but
+        // deliberately do NOT clear SecureStore: the credential itself was
+        // never rejected, only unreachable, and a transient network blip
+        // (or an 8s timeout on a slow-but-working connection) shouldn't
+        // destroy a token that's still good. Leaving it in storage means
+        // the next launch, once connectivity returns, can revalidate and
+        // reach the dashboard without asking the user to sign in again.
         setSession(null);
         setStatus('unauthenticated');
       } catch {
