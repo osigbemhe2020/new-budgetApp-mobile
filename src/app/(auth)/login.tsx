@@ -11,7 +11,8 @@ import {
 } from 'react-native';
 import { useSession } from '@/session/SessionProvider';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'http://localhost:3000';
+const API_BASE_URL =
+  process.env.EXPO_PUBLIC_API_BASE_URL || 'https://site--new-budgetapp-backend--vl2lrdxwsxyp.code.run';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -192,12 +193,12 @@ export default function LoginScreen() {
             <View style={styles.dividerLine} />
           </View>
 
-          <Pressable onPress={() => router.push('/(auth)/signup' as any)}>
+          {/* <Pressable onPress={() => router.push('/(auth)/signup' as any)}>
             <Text style={styles.signupText}>
               Don't have an account?{' '}
               <Text style={styles.signupLink}>Sign Up</Text>
             </Text>
-          </Pressable>
+          </Pressable> */}
         </View>
       </View>
     </KeyboardAvoidingView>
