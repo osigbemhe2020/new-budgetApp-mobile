@@ -193,7 +193,7 @@ export default function LoginScreen() {
             <View style={styles.dividerLine} />
           </View>
 
-          <Pressable onPress={() => router.push('/(auth)/signup')} disabled>
+          <Pressable onPress={() => router.push('/(auth)/signup')}>
             <Text style={styles.signupText}>
               Don't have an account?{' '}
               <Text style={[styles.signupLink, { opacity: 0.5 }]}>Sign Up (coming soon)</Text>
