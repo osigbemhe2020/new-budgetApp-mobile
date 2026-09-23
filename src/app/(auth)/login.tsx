@@ -72,15 +72,15 @@ export default function LoginScreen() {
       if (!response.ok) {
         const backendMessage = typeof payload?.message === 'string' ? payload.message : 'Unable to sign in';
 
-        if (response.status === 401 || response.status === 400) {
-          setFormError('Invalid email or password. Please try again.');
-          setFieldErrors((current) => ({
-            ...current,
-            password: current.password || 'Invalid email or password',
-          }));
-        } else {
-          setFormError(backendMessage || 'A server error occurred. Please try again.');
-        }
+        if (response.status === 401) {
+            setFormError(backendMessage || 'Invalid credentials');
+            setFieldErrors((current) => ({
+              ...current,
+              password: current.password || backendMessage || 'Invalid credentials',
+            }));
+          } else {
+            setFormError(backendMessage || 'A server error occurred. Please try again.');
+          }
 
         return;
       }
@@ -193,7 +193,7 @@ export default function LoginScreen() {
             <View style={styles.dividerLine} />
           </View>
 
-          <Pressable onPress={() => router.push('/(auth)/signup')}>
+          <Pressable onPress={() => router.push('/(auth)/signup' as any)}>
             <Text style={styles.signupText}>
               Don't have an account?{' '}
               <Text style={[styles.signupLink, { opacity: 0.5 }]}>Sign Up (coming soon)</Text>
