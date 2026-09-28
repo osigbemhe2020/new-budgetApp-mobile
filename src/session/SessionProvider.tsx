@@ -38,7 +38,14 @@ const DEFAULT_SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
 const API_BASE_URL = 'https://site--new-budgetapp-backend--vl2lrdxwsxyp.code.run';
 
 async function clearStoredSession() {
-  await SecureStore.deleteItemAsync(SESSION_KEY);
+  try {
+    await SecureStore.deleteItemAsync(SESSION_KEY);
+  } catch (error) {
+    // Fail loudly if SecureStore operation fails - this is a critical invariant
+    // for logout. If we can't clear the session, the user will remain logged in
+    // despite thinking they've logged out.
+    throw new Error(`Failed to clear session from SecureStore: ${error instanceof Error ? error.message : String(error)}`);
+  }
 }
 
 // Per the auth contract's Token table, the JWT's exp claim is the only
@@ -236,7 +243,18 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     // This is enforced by executing clearStoredSession() before any async operations
     // that could fail. The backend logout call is fire-and-forget and cannot block
     // the local cleanup.
-    await clearStoredSession();
+    //
+    // CRITICAL: If clearStoredSession fails, we do NOT update local state. This prevents
+    // a mismatch where the UI shows "logged out" but the token is still stored and will
+    // restore the session on next launch. The user remains on the dashboard and can retry.
+    try {
+      await clearStoredSession();
+    } catch (error) {
+      // Fail loudly if session cannot be cleared - this is a critical failure mode
+      console.error('Failed to clear session during logout:', error);
+      throw error; // Re-throw so caller can handle (e.g., show error to user)
+    }
+
     setSession(null);
     setStatus('unauthenticated');
 

@@ -1,4 +1,4 @@
-import { Text, View, StyleSheet, Pressable } from 'react-native';
+import { Text, View, StyleSheet, Pressable, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSession } from '@/session/SessionProvider';
 import { useState } from 'react';
@@ -11,8 +11,18 @@ export default function DashboardScreen() {
   const handleLogout = async () => {
     if (isLoggingOut) return;
     setIsLoggingOut(true);
-    await signOut();
-    router.replace('/(auth)/login');
+
+    try {
+      await signOut();
+      router.replace('/(auth)/login');
+    } catch (error) {
+      setIsLoggingOut(false);
+      Alert.alert(
+        'Logout Failed',
+        'Unable to clear your session. Please try again.',
+        [{ text: 'OK' }]
+      );
+    }
   };
 
   return (
