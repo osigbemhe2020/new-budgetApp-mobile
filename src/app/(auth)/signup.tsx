@@ -4,6 +4,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -41,20 +42,14 @@ export default function SignUpScreen() {
 
     if (!trimmedName) {
       nextErrors.fullName = 'Full name is required';
-    } else if (trimmedName.length < 2) {
-      nextErrors.fullName = 'Name must be at least 2 characters';
     }
 
     if (!trimmedEmail) {
       nextErrors.email = 'Email is required';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
-      nextErrors.email = 'Please enter a valid email';
     }
 
     if (!password) {
       nextErrors.password = 'Password is required';
-    } else if (password.length < 6) {
-      nextErrors.password = 'Password must be at least 6 characters';
     }
 
     setFieldErrors(nextErrors);
@@ -69,9 +64,9 @@ export default function SignUpScreen() {
     setFormError('');
     setIsSubmitting(true);
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
-
+    // No timeout for signup - it's a non-idempotent operation and aborting
+    // can lead to account creation on the server but client error, causing
+    // confusing "User already exists" on retry
     try {
       const response = await fetch(`${API_BASE_URL}/auth/signup`, {
         method: 'POST',
@@ -83,7 +78,6 @@ export default function SignUpScreen() {
           name: fullName.trim(),
           password,
         }),
-        signal: controller.signal,
       });
 
       const payload = await response.json().catch(() => ({}));
@@ -94,29 +88,13 @@ export default function SignUpScreen() {
         if (backendMessage === 'User already exists') {
           setFieldErrors((current) => ({
             ...current,
-            email: 'User already exists',
+            email: 'An account with this email already exists. Try signing in instead.',
           }));
           return;
         }
 
-        if (backendMessage === 'Email is required') {
-          setFieldErrors((current) => ({ ...current, email: 'Email is required' }));
-          return;
-        }
-
-        if (backendMessage === 'Name is required') {
-          setFieldErrors((current) => ({ ...current, fullName: 'Full name is required' }));
-          return;
-        }
-
-        if (backendMessage === 'Password is required' || backendMessage === 'Password must be at least 6 characters long') {
-          setFieldErrors((current) => ({
-            ...current,
-            password: backendMessage === 'Password is required' ? 'Password is required' : 'Password must be at least 6 characters',
-          }));
-          return;
-        }
-
+        // Note: duplicate names return 500 Internal Server Error due to a backend defect
+        // (see docs/api/auth.md: Probe: signup, duplicate name)
         setFormError(backendMessage || 'Unable to create account');
         return;
       }
@@ -129,13 +107,17 @@ export default function SignUpScreen() {
       await signIn(token, payload?.user ?? null);
       router.replace('/(app)/dashboard');
     } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') {
-        setFormError('Request timed out. Please try again.');
+      if (error instanceof Error) {
+        // Distinguish between network errors and other errors
+        if (error.message.includes('Network request failed') || error.message.includes('fetch')) {
+          setFormError('Unable to reach the server. Please check your connection and try again.');
+        } else {
+          setFormError(`An error occurred: ${error.message}`);
+        }
       } else {
-        setFormError('Unable to reach the server. Please try again.');
+        setFormError('An unexpected error occurred. Please try again.');
       }
     } finally {
-      clearTimeout(timeoutId);
       setIsSubmitting(false);
     }
   };
@@ -145,115 +127,121 @@ export default function SignUpScreen() {
       style={styles.screen}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <View style={styles.card}>
-        <View style={styles.header}>
-          <View style={styles.logoRow}>
-            <View style={styles.logoBadge}>
-              <View style={styles.logoInner} />
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollViewContent}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.card}>
+          <View style={styles.header}>
+            <View style={styles.logoRow}>
+              <View style={styles.logoBadge}>
+                <View style={styles.logoInner} />
+              </View>
+              <Text style={styles.logo}>BudgetWise</Text>
             </View>
-            <Text style={styles.logo}>BudgetWise</Text>
+
+            <Text style={styles.title}>Create account</Text>
+            <Text style={styles.subtitle}>Start building your financial identity</Text>
           </View>
 
-          <Text style={styles.title}>Create account</Text>
-          <Text style={styles.subtitle}>Start building your financial identity</Text>
-        </View>
+          <View style={styles.form}>
+            <Text style={styles.label}>Full Name</Text>
+            <View style={[styles.inputWrap, fieldErrors.fullName ? styles.inputWrapError : null]}>
+              <Text style={styles.inputIcon}>◔</Text>
+              <TextInput
+                value={fullName}
+                onChangeText={(text) => {
+                  setFullName(text);
+                  if (fieldErrors.fullName) {
+                    setFieldErrors((current) => ({ ...current, fullName: '' }));
+                  }
+                  if (formError) setFormError('');
+                }}
+                placeholder="John Doe"
+                placeholderTextColor="#6f7281"
+                autoCapitalize="words"
+                style={styles.input}
+                editable={!isSubmitting}
+              />
+            </View>
+            {fieldErrors.fullName ? <Text style={styles.errorText}>{fieldErrors.fullName}</Text> : null}
 
-        <View style={styles.form}>
-          <Text style={styles.label}>Full Name</Text>
-          <View style={[styles.inputWrap, fieldErrors.fullName ? styles.inputWrapError : null]}>
-            <Text style={styles.inputIcon}>◔</Text>
-            <TextInput
-              value={fullName}
-              onChangeText={(text) => {
-                setFullName(text);
-                if (fieldErrors.fullName) {
-                  setFieldErrors((current) => ({ ...current, fullName: '' }));
-                }
-                if (formError) setFormError('');
-              }}
-              placeholder="John Doe"
-              placeholderTextColor="#6f7281"
-              autoCapitalize="words"
-              style={styles.input}
-              editable={!isSubmitting}
-            />
-          </View>
-          {fieldErrors.fullName ? <Text style={styles.errorText}>{fieldErrors.fullName}</Text> : null}
+            <Text style={styles.label}>Email address</Text>
+            <View style={[styles.inputWrap, fieldErrors.email ? styles.inputWrapError : null]}>
+              <Text style={styles.inputIcon}>✉</Text>
+              <TextInput
+                value={email}
+                onChangeText={(text) => {
+                  setEmail(text);
+                  if (fieldErrors.email) {
+                    setFieldErrors((current) => ({ ...current, email: '' }));
+                  }
+                  if (formError) setFormError('');
+                }}
+                placeholder="you@example.com"
+                placeholderTextColor="#6f7281"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                style={styles.input}
+                editable={!isSubmitting}
+              />
+            </View>
+            {fieldErrors.email ? <Text style={styles.errorText}>{fieldErrors.email}</Text> : null}
 
-          <Text style={styles.label}>Email address</Text>
-          <View style={[styles.inputWrap, fieldErrors.email ? styles.inputWrapError : null]}>
-            <Text style={styles.inputIcon}>✉</Text>
-            <TextInput
-              value={email}
-              onChangeText={(text) => {
-                setEmail(text);
-                if (fieldErrors.email) {
-                  setFieldErrors((current) => ({ ...current, email: '' }));
-                }
-                if (formError) setFormError('');
-              }}
-              placeholder="you@example.com"
-              placeholderTextColor="#6f7281"
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-              style={styles.input}
-              editable={!isSubmitting}
-            />
-          </View>
-          {fieldErrors.email ? <Text style={styles.errorText}>{fieldErrors.email}</Text> : null}
+            <Text style={styles.label}>Password</Text>
+            <View style={[styles.inputWrap, fieldErrors.password ? styles.inputWrapError : null]}>
+              <Text style={styles.inputIcon}>🔒</Text>
+              <TextInput
+                value={password}
+                onChangeText={(text) => {
+                  setPassword(text);
+                  if (fieldErrors.password) {
+                    setFieldErrors((current) => ({ ...current, password: '' }));
+                  }
+                  if (formError) setFormError('');
+                }}
+                placeholder="••••••••"
+                placeholderTextColor="#6f7281"
+                secureTextEntry={!showPassword}
+                autoCapitalize="none"
+                autoCorrect={false}
+                style={styles.input}
+                editable={!isSubmitting}
+              />
 
-          <Text style={styles.label}>Password</Text>
-          <View style={[styles.inputWrap, fieldErrors.password ? styles.inputWrapError : null]}>
-            <Text style={styles.inputIcon}>🔒</Text>
-            <TextInput
-              value={password}
-              onChangeText={(text) => {
-                setPassword(text);
-                if (fieldErrors.password) {
-                  setFieldErrors((current) => ({ ...current, password: '' }));
-                }
-                if (formError) setFormError('');
-              }}
-              placeholder="••••••••"
-              placeholderTextColor="#6f7281"
-              secureTextEntry={!showPassword}
-              autoCapitalize="none"
-              autoCorrect={false}
-              style={styles.input}
-              editable={!isSubmitting}
-            />
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setShowPassword((current) => !current)}
+                style={styles.eyeButton}
+              >
+                <Text style={styles.eyeIcon}>{showPassword ? '◉' : '◌'}</Text>
+              </Pressable>
+            </View>
+            {fieldErrors.password ? <Text style={styles.errorText}>{fieldErrors.password}</Text> : null}
+
+            {formError ? <Text style={styles.formError}>{formError}</Text> : null}
 
             <Pressable
-              accessibilityRole="button"
-              onPress={() => setShowPassword((current) => !current)}
-              style={styles.eyeButton}
+              style={[styles.primaryButton, isSubmitting && styles.primaryButtonDisabled]}
+              onPress={handleSubmit}
+              disabled={isSubmitting}
             >
-              <Text style={styles.eyeIcon}>{showPassword ? '◉' : '◌'}</Text>
+              <Text style={styles.primaryButtonText}>
+                {isSubmitting ? 'Creating Account...' : 'Create Account'}
+              </Text>
+            </Pressable>
+
+            <Pressable onPress={() => router.push('/(auth)/login' as any)}>
+              <Text style={styles.signinText}>
+                Already have account?{' '}
+                <Text style={styles.signinLink}>Sign in</Text>
+              </Text>
             </Pressable>
           </View>
-          {fieldErrors.password ? <Text style={styles.errorText}>{fieldErrors.password}</Text> : null}
-
-          {formError ? <Text style={styles.formError}>{formError}</Text> : null}
-
-          <Pressable
-            style={[styles.primaryButton, isSubmitting && styles.primaryButtonDisabled]}
-            onPress={handleSubmit}
-            disabled={isSubmitting}
-          >
-            <Text style={styles.primaryButtonText}>
-              {isSubmitting ? 'Creating Account...' : 'Create Account'}
-            </Text>
-          </Pressable>
-
-          <Pressable onPress={() => router.push('/(auth)/login' as any)}>
-            <Text style={styles.signinText}>
-              Already have account?{' '}
-              <Text style={styles.signinLink}>Sign in</Text>
-            </Text>
-          </Pressable>
         </View>
-      </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
@@ -261,9 +249,15 @@ export default function SignUpScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
+    backgroundColor: '#eef0f4',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollViewContent: {
+    flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#eef0f4',
     paddingVertical: 24,
   },
   card: {
