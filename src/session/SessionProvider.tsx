@@ -230,10 +230,30 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
-    await clearStoredSession();
-    setSession(null);
-    setStatus('unauthenticated');
-  }, []);
+    try {
+      if (session?.token) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+        try {
+          await fetch(`${API_BASE_URL}/auth/logout`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${session.token}` },
+            signal: controller.signal,
+          });
+        } catch {
+          // Backend unreachable: still clear local storage per AC04
+        } finally {
+          clearTimeout(timeoutId);
+        }
+      }
+    } finally {
+      // Always clear local storage and update state, regardless of backend response
+      await clearStoredSession();
+      setSession(null);
+      setStatus('unauthenticated');
+    }
+  }, [session]);
 
   const value = useMemo<SessionContextValue>(
     () => ({
@@ -243,7 +263,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       signIn,
       signOut,
     }),
-    [session, signIn, signOut, status],
+    [status, session, signIn, signOut],
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

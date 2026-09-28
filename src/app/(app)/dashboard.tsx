@@ -1,15 +1,29 @@
-import { Text, View, StyleSheet } from 'react-native';
+import { Text, View, StyleSheet, Pressable } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useSession } from '@/session/SessionProvider';
 
 export default function DashboardScreen() {
-  const { session } = useSession();
+  const { session, signOut } = useSession();
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    await signOut();
+    router.replace('/(auth)/login');
+  };
 
   return (
     <View style={styles.container}>
       <View style={styles.profileSection}>
-        <Text style={styles.greeting}>Welcome back</Text>
-        <Text style={styles.userName}>{session?.user?.FullName}</Text>
-        <Text style={styles.userEmail}>{session?.user?.Email}</Text>
+        <View style={styles.headerRow}>
+          <View style={styles.greetingContainer}>
+            <Text style={styles.greeting}>Welcome back</Text>
+            <Text style={styles.userName}>{session?.user?.FullName}</Text>
+            <Text style={styles.userEmail}>{session?.user?.Email}</Text>
+          </View>
+          <Pressable style={styles.logoutButton} onPress={handleLogout}>
+            <Text style={styles.logoutButtonText}>Log Out</Text>
+          </Pressable>
+        </View>
       </View>
 
       <View style={styles.emptyState}>
@@ -31,6 +45,14 @@ const styles = StyleSheet.create({
     marginBottom: 40,
     paddingHorizontal: 16,
   },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  greetingContainer: {
+    flex: 1,
+  },
   greeting: {
     fontSize: 16,
     color: '#6e7587',
@@ -45,6 +67,18 @@ const styles = StyleSheet.create({
   userEmail: {
     fontSize: 16,
     color: '#5f6273',
+  },
+  logoutButton: {
+    backgroundColor: '#0d6edb',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginLeft: 16,
+  },
+  logoutButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   emptyState: {
     flex: 1,
