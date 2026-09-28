@@ -64,9 +64,14 @@ export default function SignUpScreen() {
     setFormError('');
     setIsSubmitting(true);
 
-    // No timeout for signup - it's a non-idempotent operation and aborting
-    // can lead to account creation on the server but client error, causing
-    // confusing "User already exists" on retry
+    // UI timeout to reset submit button after 30 seconds (acceptance criterion)
+    // We do NOT abort the request itself to avoid the "User already exists" issue
+    // where the server commits but the client times out and retries
+    const uiTimeoutId = setTimeout(() => {
+      setIsSubmitting(false);
+      setFormError('Request is taking longer than expected. If your account was created, try signing in.');
+    }, 30000);
+
     try {
       const response = await fetch(`${API_BASE_URL}/auth/signup`, {
         method: 'POST',
@@ -79,6 +84,8 @@ export default function SignUpScreen() {
           password,
         }),
       });
+
+      clearTimeout(uiTimeoutId);
 
       const payload = await response.json().catch(() => ({}));
 
@@ -107,6 +114,8 @@ export default function SignUpScreen() {
       await signIn(token, payload?.user ?? null);
       router.replace('/(app)/dashboard');
     } catch (error) {
+      clearTimeout(uiTimeoutId);
+
       if (error instanceof Error) {
         // Distinguish between network errors and other errors
         if (error.message.includes('Network request failed') || error.message.includes('fetch')) {
@@ -118,6 +127,7 @@ export default function SignUpScreen() {
         setFormError('An unexpected error occurred. Please try again.');
       }
     } finally {
+      clearTimeout(uiTimeoutId);
       setIsSubmitting(false);
     }
   };
