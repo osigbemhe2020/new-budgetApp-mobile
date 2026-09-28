@@ -230,28 +230,30 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
-    try {
-      if (session?.token) {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
+    const token = session?.token;
 
-        try {
-          await fetch(`${API_BASE_URL}/auth/logout`, {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${session.token}` },
-            signal: controller.signal,
-          });
-        } catch {
-          // Backend unreachable: still clear local storage per AC04
-        } finally {
-          clearTimeout(timeoutId);
-        }
-      }
-    } finally {
-      // Always clear local storage and update state, regardless of backend response
-      await clearStoredSession();
-      setSession(null);
-      setStatus('unauthenticated');
+    // INVARIANT: Local session is always cleared, even if backend is unreachable.
+    // This is enforced by executing clearStoredSession() before any async operations
+    // that could fail. The backend logout call is fire-and-forget and cannot block
+    // the local cleanup.
+    await clearStoredSession();
+    setSession(null);
+    setStatus('unauthenticated');
+
+    // Fire-and-forget backend logout call (doesn't block local cleanup or navigation)
+    if (token) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+      fetch(`${API_BASE_URL}/auth/logout`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        signal: controller.signal,
+      }).catch(() => {
+        // Backend unreachable: session already cleared locally per invariant above
+      }).finally(() => {
+        clearTimeout(timeoutId);
+      });
     }
   }, [session]);
 

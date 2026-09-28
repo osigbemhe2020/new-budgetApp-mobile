@@ -1,12 +1,16 @@
 import { Text, View, StyleSheet, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSession } from '@/session/SessionProvider';
+import { useState } from 'react';
 
 export default function DashboardScreen() {
   const { session, signOut } = useSession();
   const router = useRouter();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const handleLogout = async () => {
+    if (isLoggingOut) return;
+    setIsLoggingOut(true);
     await signOut();
     router.replace('/(auth)/login');
   };
@@ -20,8 +24,14 @@ export default function DashboardScreen() {
             <Text style={styles.userName}>{session?.user?.FullName}</Text>
             <Text style={styles.userEmail}>{session?.user?.Email}</Text>
           </View>
-          <Pressable style={styles.logoutButton} onPress={handleLogout}>
-            <Text style={styles.logoutButtonText}>Log Out</Text>
+          <Pressable
+            style={[styles.logoutButton, isLoggingOut && styles.logoutButtonDisabled]}
+            onPress={handleLogout}
+            disabled={isLoggingOut}
+          >
+            <Text style={styles.logoutButtonText}>
+              {isLoggingOut ? 'Logging out...' : 'Log Out'}
+            </Text>
           </Pressable>
         </View>
       </View>
@@ -74,6 +84,9 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 12,
     marginLeft: 16,
+  },
+  logoutButtonDisabled: {
+    opacity: 0.6,
   },
   logoutButtonText: {
     color: '#ffffff',
