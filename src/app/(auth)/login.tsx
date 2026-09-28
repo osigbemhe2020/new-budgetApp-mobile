@@ -17,7 +17,7 @@ const API_BASE_URL =
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { signIn } = useSession();
+  const { signIn, networkError } = useSession();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -189,6 +189,7 @@ export default function LoginScreen() {
             </View>
             {fieldErrors.password ? <Text style={styles.errorText}>{fieldErrors.password}</Text> : null}
 
+            {networkError ? <Text style={styles.formError}>Unable to reach the server. Please check your connection and try again.</Text> : null}
             {formError ? <Text style={styles.formError}>{formError}</Text> : null}
 
             <Pressable style={styles.forgotButton}>

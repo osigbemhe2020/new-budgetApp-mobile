@@ -31,6 +31,7 @@ type SessionContextValue = {
   isReady: boolean;
   signIn: (token: string, user?: SessionUser | null) => Promise<void>;
   signOut: () => Promise<void>;
+  networkError: boolean;
 };
 
 const SESSION_KEY = 'budgetapp-session';
@@ -157,6 +158,7 @@ const SessionContext = createContext<SessionContextValue | undefined>(undefined)
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<SessionData | null>(null);
   const [status, setStatus] = useState<SessionStatus>('loading');
+  const [networkError, setNetworkError] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -170,6 +172,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         if (!storedSession) {
           setSession(null);
           setStatus('unauthenticated');
+          setNetworkError(false);
           return;
         }
 
@@ -182,6 +185,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           // it's changed since sign-in.
           setSession({ ...storedSession, user: check.user ?? storedSession.user });
           setStatus('authenticated');
+          setNetworkError(false);
           return;
         }
 
@@ -205,6 +209,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         // reach the dashboard without asking the user to sign in again.
         setSession(null);
         setStatus('unauthenticated');
+        setNetworkError(true);
       } catch {
         if (!active) return;
 
@@ -242,6 +247,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
     setSession(nextSession);
     setStatus('authenticated');
+    setNetworkError(false);
   }, []);
 
   const signOut = useCallback(async () => {
@@ -290,8 +296,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       isReady: status !== 'loading',
       signIn,
       signOut,
+      networkError,
     }),
-    [status, session, signIn, signOut],
+    [status, session, signIn, signOut, networkError],
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
