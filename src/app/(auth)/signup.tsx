@@ -46,6 +46,8 @@ export default function SignUpScreen() {
 
     if (!trimmedEmail) {
       nextErrors.email = 'Email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      nextErrors.email = 'Enter a valid email address';
     }
 
     if (!password) {

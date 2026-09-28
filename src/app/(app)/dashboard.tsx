@@ -6,8 +6,16 @@ export default function DashboardScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Dashboard</Text>
-      <Text style={styles.text}>Signed in as {session?.user?.FullName ?? 'User'}</Text>
+      <View style={styles.profileSection}>
+        <Text style={styles.greeting}>Welcome back</Text>
+        <Text style={styles.userName}>{session?.user?.FullName ?? 'User'}</Text>
+        <Text style={styles.userEmail}>{session?.user?.Email ?? ''}</Text>
+      </View>
+
+      <View style={styles.emptyState}>
+        <Text style={styles.emptyIcon}>📊</Text>
+        <Text style={styles.emptyText}>Nothing here yet.</Text>
+      </View>
     </View>
   );
 }
@@ -15,17 +23,42 @@ export default function DashboardScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#f7f7f8',
+    padding: 24,
+  },
+  profileSection: {
+    marginTop: 60,
+    marginBottom: 40,
+    paddingHorizontal: 16,
+  },
+  greeting: {
+    fontSize: 16,
+    color: '#6e7587',
+    marginBottom: 8,
+  },
+  userName: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: '#1d1f2a',
+    marginBottom: 4,
+  },
+  userEmail: {
+    fontSize: 16,
+    color: '#5f6273',
+  },
+  emptyState: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 24,
-    gap: 12,
+    paddingVertical: 80,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
+  emptyIcon: {
+    fontSize: 64,
+    marginBottom: 16,
   },
-  text: {
-    fontSize: 16,
+  emptyText: {
+    fontSize: 24,
+    color: '#6e7587',
     textAlign: 'center',
   },
 });
