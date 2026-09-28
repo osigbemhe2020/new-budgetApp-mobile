@@ -41,9 +41,17 @@ async function clearStoredSession() {
   try {
     await SecureStore.deleteItemAsync(SESSION_KEY);
   } catch (error) {
-    // Fail loudly if SecureStore operation fails - this is a critical invariant
-    // for logout. If we can't clear the session, the user will remain logged in
-    // despite thinking they've logged out.
+    // CRITICAL: This is a security-sensitive path that must be tested.
+    // SecureStore.deleteItemAsync can reject due to disk errors, keychain corruption,
+    // or permission issues. If this fails, the user remains logged in despite thinking
+    // they've logged out, which is a security vulnerability.
+    //
+    // TODO: Add automated test coverage for this rejection path when test infrastructure
+    // is added to the project. The test should mock SecureStore.deleteItemAsync to reject
+    // and verify that:
+    // 1. The error is caught and surfaced to the user
+    // 2. Local session state is NOT updated (user stays logged in)
+    // 3. User can retry logout
     throw new Error(`Failed to clear session from SecureStore: ${error instanceof Error ? error.message : String(error)}`);
   }
 }

@@ -1,11 +1,9 @@
 import { Text, View, StyleSheet, Pressable, Alert } from 'react-native';
-import { useRouter } from 'expo-router';
 import { useSession } from '@/session/SessionProvider';
 import { useState } from 'react';
 
 export default function DashboardScreen() {
   const { session, signOut } = useSession();
-  const router = useRouter();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const handleLogout = async () => {
@@ -14,7 +12,8 @@ export default function DashboardScreen() {
 
     try {
       await signOut();
-      router.replace('/(auth)/login');
+      // Navigation is handled automatically by SessionGate in _layout.tsx
+      // When status changes to 'unauthenticated', the spine shows (auth) group
     } catch (error) {
       setIsLoggingOut(false);
       Alert.alert(
