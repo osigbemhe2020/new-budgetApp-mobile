@@ -50,11 +50,8 @@ export default function LoginScreen() {
     setFormError('');
     setIsSubmitting(true);
 
-    // UI timeout to reset submit button after 30 seconds (acceptance criterion)
-    const uiTimeoutId = setTimeout(() => {
-      setIsSubmitting(false);
-      setFormError('Request is taking longer than expected. Please try again.');
-    }, 30000);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
 
     try {
       const response = await fetch(`${API_BASE_URL}/auth/login`, {
@@ -66,9 +63,10 @@ export default function LoginScreen() {
           email: email.trim(),
           password,
         }),
+        signal: controller.signal,
       });
 
-      clearTimeout(uiTimeoutId);
+      clearTimeout(timeoutId);
 
       const payload = await response.json().catch(() => ({}));
 
@@ -96,11 +94,12 @@ export default function LoginScreen() {
       await signIn(token, payload?.user ?? null);
       router.replace('/(app)/dashboard');
     } catch (error) {
-      clearTimeout(uiTimeoutId);
+      clearTimeout(timeoutId);
 
       if (error instanceof Error) {
-        // Distinguish between network errors and other errors
-        if (error.message.includes('Network request failed') || error.message.includes('fetch')) {
+        if (error.name === 'AbortError') {
+          setFormError('Request timed out. Please try again.');
+        } else if (error.message.includes('Network request failed') || error.message.includes('fetch')) {
           setFormError('Unable to reach the server. Please check your connection and try again.');
         } else {
           setFormError(`An error occurred: ${error.message}`);
@@ -109,7 +108,7 @@ export default function LoginScreen() {
         setFormError('An unexpected error occurred. Please try again.');
       }
     } finally {
-      clearTimeout(uiTimeoutId);
+      clearTimeout(timeoutId);
       setIsSubmitting(false);
     }
   };
