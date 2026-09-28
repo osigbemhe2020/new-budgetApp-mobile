@@ -38,7 +38,22 @@ const DEFAULT_SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
 const API_BASE_URL = 'https://site--new-budgetapp-backend--vl2lrdxwsxyp.code.run';
 
 async function clearStoredSession() {
-  await SecureStore.deleteItemAsync(SESSION_KEY);
+  try {
+    await SecureStore.deleteItemAsync(SESSION_KEY);
+  } catch (error) {
+    // CRITICAL: This is a security-sensitive path that must be tested.
+    // SecureStore.deleteItemAsync can reject due to disk errors, keychain corruption,
+    // or permission issues. If this fails, the user remains logged in despite thinking
+    // they've logged out, which is a security vulnerability.
+    //
+    // TODO: Add automated test coverage for this rejection path when test infrastructure
+    // is added to the project. The test should mock SecureStore.deleteItemAsync to reject
+    // and verify that:
+    // 1. The error is caught and surfaced to the user
+    // 2. Local session state is NOT updated (user stays logged in)
+    // 3. User can retry logout
+    throw new Error(`Failed to clear session from SecureStore: ${error instanceof Error ? error.message : String(error)}`);
+  }
 }
 
 // Per the auth contract's Token table, the JWT's exp claim is the only
@@ -230,10 +245,43 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
-    await clearStoredSession();
+    const token = session?.token;
+
+    // INVARIANT: Local session is always cleared, even if backend is unreachable.
+    // This is enforced by executing clearStoredSession() before any async operations
+    // that could fail. The backend logout call is fire-and-forget and cannot block
+    // the local cleanup.
+    //
+    // CRITICAL: If clearStoredSession fails, we do NOT update local state. This prevents
+    // a mismatch where the UI shows "logged out" but the token is still stored and will
+    // restore the session on next launch. The user remains on the dashboard and can retry.
+    try {
+      await clearStoredSession();
+    } catch (error) {
+      // Fail loudly if session cannot be cleared - this is a critical failure mode
+      console.error('Failed to clear session during logout:', error);
+      throw error; // Re-throw so caller can handle (e.g., show error to user)
+    }
+
     setSession(null);
     setStatus('unauthenticated');
-  }, []);
+
+    // Fire-and-forget backend logout call (doesn't block local cleanup or navigation)
+    if (token) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+      fetch(`${API_BASE_URL}/auth/logout`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        signal: controller.signal,
+      }).catch(() => {
+        // Backend unreachable: session already cleared locally per invariant above
+      }).finally(() => {
+        clearTimeout(timeoutId);
+      });
+    }
+  }, [session]);
 
   const value = useMemo<SessionContextValue>(
     () => ({
@@ -243,7 +291,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       signIn,
       signOut,
     }),
-    [session, signIn, signOut, status],
+    [status, session, signIn, signOut],
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

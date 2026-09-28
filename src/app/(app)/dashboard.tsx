@@ -1,15 +1,48 @@
-import { Text, View, StyleSheet } from 'react-native';
+import { Text, View, StyleSheet, Pressable, Alert } from 'react-native';
 import { useSession } from '@/session/SessionProvider';
+import { useState } from 'react';
 
 export default function DashboardScreen() {
-  const { session } = useSession();
+  const { session, signOut } = useSession();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  const handleLogout = async () => {
+    if (isLoggingOut) return;
+    setIsLoggingOut(true);
+
+    try {
+      await signOut();
+      // Navigation is handled automatically by SessionGate in _layout.tsx
+      // When status changes to 'unauthenticated', the spine shows (auth) group
+    } catch (error) {
+      setIsLoggingOut(false);
+      Alert.alert(
+        'Logout Failed',
+        'Unable to clear your session. Please try again.',
+        [{ text: 'OK' }]
+      );
+    }
+  };
 
   return (
     <View style={styles.container}>
       <View style={styles.profileSection}>
-        <Text style={styles.greeting}>Welcome back</Text>
-        <Text style={styles.userName}>{session?.user?.FullName ?? 'User'}</Text>
-        <Text style={styles.userEmail}>{session?.user?.Email ?? ''}</Text>
+        <View style={styles.headerRow}>
+          <View style={styles.greetingContainer}>
+            <Text style={styles.greeting}>Welcome back</Text>
+            <Text style={styles.userName}>{session?.user?.FullName}</Text>
+            <Text style={styles.userEmail}>{session?.user?.Email}</Text>
+          </View>
+          <Pressable
+            style={[styles.logoutButton, isLoggingOut && styles.logoutButtonDisabled]}
+            onPress={handleLogout}
+            disabled={isLoggingOut}
+          >
+            <Text style={styles.logoutButtonText}>
+              {isLoggingOut ? 'Logging out...' : 'Log Out'}
+            </Text>
+          </Pressable>
+        </View>
       </View>
 
       <View style={styles.emptyState}>
@@ -31,6 +64,14 @@ const styles = StyleSheet.create({
     marginBottom: 40,
     paddingHorizontal: 16,
   },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  greetingContainer: {
+    flex: 1,
+  },
   greeting: {
     fontSize: 16,
     color: '#6e7587',
@@ -45,6 +86,21 @@ const styles = StyleSheet.create({
   userEmail: {
     fontSize: 16,
     color: '#5f6273',
+  },
+  logoutButton: {
+    backgroundColor: '#0d6edb',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginLeft: 16,
+  },
+  logoutButtonDisabled: {
+    opacity: 0.6,
+  },
+  logoutButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   emptyState: {
     flex: 1,
