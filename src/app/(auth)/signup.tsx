@@ -52,8 +52,6 @@ export default function SignUpScreen() {
 
     if (!password) {
       nextErrors.password = 'Password is required';
-    } else if (password.length < 6) {
-      nextErrors.password = 'Password must be at least 6 characters';
     }
 
     setFieldErrors(nextErrors);
@@ -96,14 +94,6 @@ export default function SignUpScreen() {
           setFieldErrors((current) => ({
             ...current,
             email: 'An account with this email already exists. Try signing in instead.',
-          }));
-          return;
-        }
-
-        if (backendMessage === 'Password must be at least 6 characters long') {
-          setFieldErrors((current) => ({
-            ...current,
-            password: 'Password must be at least 6 characters',
           }));
           return;
         }
