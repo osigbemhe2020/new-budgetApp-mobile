@@ -8,8 +8,8 @@ export default function DashboardScreen() {
     <View style={styles.container}>
       <View style={styles.profileSection}>
         <Text style={styles.greeting}>Welcome back</Text>
-        <Text style={styles.userName}>{session?.user?.FullName ?? 'User'}</Text>
-        <Text style={styles.userEmail}>{session?.user?.Email ?? ''}</Text>
+        <Text style={styles.userName}>{session?.user?.FullName}</Text>
+        <Text style={styles.userEmail}>{session?.user?.Email}</Text>
       </View>
 
       <View style={styles.emptyState}>
