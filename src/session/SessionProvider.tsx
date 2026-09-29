@@ -302,7 +302,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const retrySessionCheck = useCallback(async () => {
-    setStatus('loading');
     const storedSession = await readStoredSession();
     if (!storedSession) {
       setSession(null);
