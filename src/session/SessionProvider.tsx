@@ -31,6 +31,10 @@ type SessionContextValue = {
   isReady: boolean;
   signIn: (token: string, user?: SessionUser | null) => Promise<void>;
   signOut: () => Promise<void>;
+  networkError: boolean;
+  sessionRejected: boolean;
+  clearNetworkError: () => void;
+  retrySessionCheck: () => Promise<void>;
 };
 
 const SESSION_KEY = 'budgetapp-session';
@@ -157,6 +161,8 @@ const SessionContext = createContext<SessionContextValue | undefined>(undefined)
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<SessionData | null>(null);
   const [status, setStatus] = useState<SessionStatus>('loading');
+  const [networkError, setNetworkError] = useState(false);
+  const [sessionRejected, setSessionRejected] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -170,6 +176,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         if (!storedSession) {
           setSession(null);
           setStatus('unauthenticated');
+          setNetworkError(false);
           return;
         }
 
@@ -182,6 +189,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           // it's changed since sign-in.
           setSession({ ...storedSession, user: check.user ?? storedSession.user });
           setStatus('authenticated');
+          setNetworkError(false);
           return;
         }
 
@@ -191,6 +199,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           await clearStoredSession();
           setSession(null);
           setStatus('unauthenticated');
+          setSessionRejected(true);
+          setNetworkError(false);
           return;
         }
 
@@ -205,6 +215,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         // reach the dashboard without asking the user to sign in again.
         setSession(null);
         setStatus('unauthenticated');
+        setNetworkError(true);
       } catch {
         if (!active) return;
 
@@ -242,6 +253,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
     setSession(nextSession);
     setStatus('authenticated');
+    setNetworkError(false);
+    setSessionRejected(false);
   }, []);
 
   const signOut = useCallback(async () => {
@@ -265,6 +278,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
     setSession(null);
     setStatus('unauthenticated');
+    setNetworkError(false);
 
     // Fire-and-forget backend logout call (doesn't block local cleanup or navigation)
     if (token) {
@@ -283,6 +297,42 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }
   }, [session]);
 
+  const clearNetworkError = useCallback(() => {
+    setNetworkError(false);
+  }, []);
+
+  const retrySessionCheck = useCallback(async () => {
+    const storedSession = await readStoredSession();
+    if (!storedSession) {
+      setSession(null);
+      setStatus('unauthenticated');
+      setNetworkError(false);
+      setSessionRejected(false);
+      return;
+    }
+
+    const check = await checkSessionWithServer(storedSession.token);
+
+    if (check.outcome === 'valid') {
+      setSession({ ...storedSession, user: check.user ?? storedSession.user });
+      setStatus('authenticated');
+      setNetworkError(false);
+      setSessionRejected(false);
+    } else if (check.outcome === 'invalid') {
+      await clearStoredSession();
+      setSession(null);
+      setStatus('unauthenticated');
+      setSessionRejected(true);
+      setNetworkError(false);
+    } else {
+      // unreachable
+      setSession(null);
+      setStatus('unauthenticated');
+      setNetworkError(true);
+      setSessionRejected(false);
+    }
+  }, []);
+
   const value = useMemo<SessionContextValue>(
     () => ({
       status,
@@ -290,8 +340,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       isReady: status !== 'loading',
       signIn,
       signOut,
+      networkError,
+      sessionRejected,
+      clearNetworkError,
+      retrySessionCheck,
     }),
-    [status, session, signIn, signOut],
+    [status, session, signIn, signOut, networkError, sessionRejected, clearNetworkError, retrySessionCheck],
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
