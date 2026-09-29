@@ -17,7 +17,7 @@ const API_BASE_URL =
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { signIn, networkError } = useSession();
+  const { signIn, networkError, sessionRejected, clearNetworkError, retrySessionCheck } = useSession();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -25,6 +25,7 @@ export default function LoginScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [fieldErrors, setFieldErrors] = useState({ email: '', password: '' });
   const [formError, setFormError] = useState('');
+  const [isRetrying, setIsRetrying] = useState(false);
 
   const validateForm = () => {
     const trimmedEmail = email.trim();
@@ -44,12 +45,20 @@ export default function LoginScreen() {
     return !nextErrors.email && !nextErrors.password;
   };
 
+  const handleRetrySession = async () => {
+    setIsRetrying(true);
+    setFormError('');
+    await retrySessionCheck();
+    setIsRetrying(false);
+  };
+
   const handleSubmit = async () => {
     if (!validateForm()) {
       return;
     }
 
     setFormError('');
+    clearNetworkError();
     setIsSubmitting(true);
 
     const controller = new AbortController();
@@ -87,6 +96,9 @@ export default function LoginScreen() {
 
         return;
       }
+
+      // Server responded successfully - clear network error if it was set
+      // We reached the server, so any previous network error is resolved
 
       const token = payload?.token;
       if (!token) {
@@ -148,6 +160,7 @@ export default function LoginScreen() {
                   if (fieldErrors.email) {
                     setFieldErrors((current) => ({ ...current, email: '' }));
                   }
+                  if (networkError) clearNetworkError();
                 }}
                 placeholder="Email address"
                 placeholderTextColor="#6f7281"
@@ -189,7 +202,15 @@ export default function LoginScreen() {
             </View>
             {fieldErrors.password ? <Text style={styles.errorText}>{fieldErrors.password}</Text> : null}
 
-            {networkError ? <Text style={styles.formError}>Unable to reach the server. Please check your connection and try again.</Text> : null}
+            {sessionRejected ? <Text style={styles.formError}>Your session has expired. Please sign in again.</Text> : null}
+            {networkError ? (
+              <View style={styles.networkErrorContainer}>
+                <Text style={styles.formError}>Unable to reach the server. Please check your connection.</Text>
+                <Pressable style={styles.retryButton} onPress={handleRetrySession} disabled={isRetrying}>
+                  <Text style={styles.retryButtonText}>{isRetrying ? 'Retrying...' : 'Retry Connection'}</Text>
+                </Pressable>
+              </View>
+            ) : null}
             {formError ? <Text style={styles.formError}>{formError}</Text> : null}
 
             <Pressable style={styles.forgotButton}>
@@ -362,6 +383,22 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginBottom: 12,
     textAlign: 'center',
+  },
+  networkErrorContainer: {
+    marginBottom: 12,
+  },
+  retryButton: {
+    backgroundColor: '#0d6edb',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    marginTop: 8,
+    alignSelf: 'center',
+  },
+  retryButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   forgotButton: {
     alignSelf: 'flex-end',
