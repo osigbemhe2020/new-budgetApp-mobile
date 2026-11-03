@@ -28,5 +28,12 @@ runs entirely on the device, so it works without a connection. Writes happen
 inside a transaction, so an entry is never silently lost. Implementation
 tickets must show the user an error when a write fails.
 
+## Dependency status
+expo-sqlite is not yet installed in this project. It will be added in MIMO-002,
+alongside the table and the save path. AsyncStorage is already installed but was
+rejected: it has no transactions and rewrites the whole list on every save, so
+it is weaker on the "never silently lost" requirement, and its untyped strings
+make a later sync a rewrite instead of a mapping.
+
 ## Revisit when
 Server-side entry storage is verified and a sync ticket is planned.
