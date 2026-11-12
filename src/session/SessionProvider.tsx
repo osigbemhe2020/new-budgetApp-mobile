@@ -124,10 +124,10 @@ type ProfileCheckResult =
 // bounded with an AbortController timeout below, so it always resolves
 // to 'unreachable' rather than hanging bootstrapSession indefinitely.
 //
-// Per AC04 ("an expired or invalid session lands on login... never the
-// dashboard"), 'unreachable' is NOT treated as valid — an unconfirmed
-// session is not a confirmed session. See bootstrapSession: 'invalid'
-// and 'unreachable' both clear storage and route to login.
+// If the token is still locally valid but the server is unreachable, the app
+// should remain on the dashboard with the cached session so offline entry
+// viewing and saving still work. Only an explicit invalid/expired token clears
+// the session; a network timeout is not proof that the session is bad.
 const PROFILE_CHECK_TIMEOUT_MS = 8000;
 
 async function checkSessionWithServer(token: string): Promise<ProfileCheckResult> {
@@ -205,17 +205,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         }
 
         // check.outcome === 'unreachable': the server never confirmed OR
-        // rejected the token — this is not the same case AC04 covers.
-        // Show login (no confirmed-valid session, so no dashboard), but
-        // deliberately do NOT clear SecureStore: the credential itself was
-        // never rejected, only unreachable, and a transient network blip
-        // (or an 8s timeout on a slow-but-working connection) shouldn't
-        // destroy a token that's still good. Leaving it in storage means
-        // the next launch, once connectivity returns, can revalidate and
-        // reach the dashboard without asking the user to sign in again.
-        setSession(null);
-        setStatus('unauthenticated');
+        // rejected the token, but the cached session is still locally valid.
+        // Keep the user signed in so the local SQLite dashboard continues to
+        // work offline, while explicitly surfacing a network warning to the
+        // user that the server cannot currently be revalidated.
+        setSession({ ...storedSession, user: storedSession.user });
+        setStatus('authenticated');
         setNetworkError(true);
+        setSessionRejected(false);
       } catch {
         if (!active) return;
 
@@ -325,9 +322,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setSessionRejected(true);
       setNetworkError(false);
     } else {
-      // unreachable
-      setSession(null);
-      setStatus('unauthenticated');
+      // unreachable: keep the cached session alive so the device can remain
+      // usable offline while a network warning is shown to the user.
+      setSession({ ...storedSession, user: storedSession.user });
+      setStatus('authenticated');
       setNetworkError(true);
       setSessionRejected(false);
     }
