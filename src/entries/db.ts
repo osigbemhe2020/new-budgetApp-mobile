@@ -40,6 +40,34 @@ export function getDb() {
   return dbPromise;
 }
 
+export type EntryUpdate = Pick<NewEntry, 'direction' | 'amountKobo' | 'label' | 'category' | 'date'>;
+
+// Updates the editable fields on a row while preserving created_at.
+// The match is by both id and user_id, so one account cannot edit another user's row.
+// A no-op update indicates the row did not change, so it is surfaced as an error.
+export async function updateEntry(userId: string, id: string, e: EntryUpdate): Promise<void> {
+  const db = await getDb();
+  const result = await db.runAsync(
+    `UPDATE entries
+        SET direction = ?,
+            amount_kobo = ?,
+            label = ?,
+            category = ?,
+            entry_date = ?
+      WHERE id = ?
+        AND user_id = ?`,
+    e.direction, e.amountKobo, e.label, e.category, e.date, id, userId
+  );
+
+  const changed = typeof (result as { changes?: number } | undefined)?.changes === 'number'
+    ? (result as { changes: number }).changes
+    : 0;
+
+  if (changed === 0) {
+    throw new Error('Entry not found or not editable by this user');
+  }
+}
+
 // Resolves only after SQLite has committed the row. Throws on any failure.
 // A single INSERT is atomic, so no explicit transaction is needed.
 // INSERT OR IGNORE + a stable id means retrying the same entry cannot create a duplicate.
@@ -53,7 +81,9 @@ export async function addEntry(userId: string, e: NewEntry): Promise<void> {
   );
 }
 
-// Newest recorded first, so a just-saved entry is always at the top (even if its date is in the past).
+// Sort by the actual money movement date, newest first, with created_at only as
+// the tie-breaker for rows that share the same day. This keeps a past-dated entry
+// above newer records when the day is later, without creating a migration.
 export async function listRecentEntries(userId: string, limit = 20): Promise<Entry[]> {
   const db = await getDb();
   return db.getAllAsync<Entry>(
@@ -61,7 +91,7 @@ export async function listRecentEntries(userId: string, limit = 20): Promise<Ent
             entry_date AS date, created_at AS createdAt
        FROM entries
       WHERE user_id = ?
-      ORDER BY created_at DESC
+      ORDER BY entry_date DESC, created_at DESC
       LIMIT ?`,
     userId, limit
   );

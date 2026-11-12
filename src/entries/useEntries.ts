@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { addEntry, getBalanceKobo, listRecentEntries } from './db';
+import { addEntry, getBalanceKobo, listRecentEntries, updateEntry } from './db';
 import type { Entry, NewEntry } from './types';
 
 export function useEntries(userId: string | null) {
@@ -37,5 +37,16 @@ export function useEntries(userId: string | null) {
     [userId, refresh]
   );
 
-  return { entries, balanceKobo, loadError, refresh, save };
+  // Writes the update, then reloads the canonical list and balance from SQLite so they
+  // stay in sync without manually patching state.
+  const update = useCallback(
+    async (id: string, update: Pick<NewEntry, 'direction' | 'amountKobo' | 'label' | 'category' | 'date'>) => {
+      if (!userId) throw new Error('Not signed in');
+      await updateEntry(userId, id, update);
+      await refresh();
+    },
+    [userId, refresh]
+  );
+
+  return { entries, balanceKobo, loadError, refresh, save, update };
 }
