@@ -45,8 +45,14 @@ function EntryRow({ entry }: { entry: Entry }) {
 
 // Drop this inside your dashboard screen: <EntriesDashboard userId={...} />
 export function EntriesDashboard({ userId }: { userId: string }) {
-  const { entries, balanceKobo, loadError, refresh, save } = useEntries(userId);
+  const { entries, balanceKobo, loadError, refresh, save, update } = useEntries(userId);
   const [formOpen, setFormOpen] = useState(false);
+  const [editingEntry, setEditingEntry] = useState<Entry | null>(null);
+
+  const closeForm = () => {
+    setFormOpen(false);
+    setEditingEntry(null);
+  };
 
   const loaded = entries !== null;
 
@@ -55,7 +61,14 @@ export function EntriesDashboard({ userId }: { userId: string }) {
       <FlatList
         data={entries ?? []}
         keyExtractor={(e) => e.id}
-        renderItem={({ item }) => <EntryRow entry={item} />}
+        renderItem={({ item }) => (
+          <Pressable onPress={() => {
+            setEditingEntry(item);
+            setFormOpen(true);
+          }}>
+            <EntryRow entry={item} />
+          </Pressable>
+        )}
         contentContainerStyle={styles.list}
         ListHeaderComponent={
           <View style={styles.header}>
@@ -63,7 +76,10 @@ export function EntriesDashboard({ userId }: { userId: string }) {
               <Text style={styles.balanceLabel}>Balance (₦)</Text>
               <Text style={styles.balance}>{formatNaira(balanceKobo)}</Text>
             </View>
-            <PrimaryButton label="Add entry" onPress={() => setFormOpen(true)} />
+            <PrimaryButton label="Add entry" onPress={() => {
+              setEditingEntry(null);
+              setFormOpen(true);
+            }} />
             <Text style={styles.sectionTitle}>Recent entries</Text>
             {loadError ? (
               <View style={styles.notice}>
@@ -91,23 +107,35 @@ export function EntriesDashboard({ userId }: { userId: string }) {
         visible={formOpen}
         animationType="slide"
         presentationStyle="pageSheet"
-        onRequestClose={() => setFormOpen(false)}
+        onRequestClose={closeForm}
       >
         <KeyboardAvoidingView
           style={styles.modal}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>New entry</Text>
-            <Pressable onPress={() => setFormOpen(false)} accessibilityRole="button" hitSlop={8}>
+            <Text style={styles.modalTitle}>{editingEntry ? 'Edit entry' : 'New entry'}</Text>
+            <Pressable onPress={closeForm} accessibilityRole="button" hitSlop={8}>
               <Text style={styles.close}>Close</Text>
             </Pressable>
           </View>
           <ScrollView contentContainerStyle={styles.modalBody} keyboardShouldPersistTaps="handled">
             <EntryForm
+              key={editingEntry?.id ?? 'new-entry'}
+              entry={editingEntry}
               onSave={async (entry) => {
-                await save(entry); // throws if the write failed, so the form shows its error
-                setFormOpen(false); // reached only after the entry is stored
+                if (editingEntry) {
+                  await update(editingEntry.id, {
+                    direction: entry.direction,
+                    amountKobo: entry.amountKobo,
+                    label: entry.label,
+                    category: entry.category,
+                    date: entry.date,
+                  });
+                } else {
+                  await save(entry); // throws if the write failed, so the form shows its error
+                }
+                closeForm();
               }}
             />
           </ScrollView>

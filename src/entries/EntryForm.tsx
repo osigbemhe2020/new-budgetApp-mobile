@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import * as Crypto from 'expo-crypto';
 import { FormField } from '@/components/ui/FormField';
@@ -9,7 +9,7 @@ import { PrimaryButton } from '@/components/auth/PrimaryButton';
 import { todayString } from '@/utils/date';
 import { CATEGORIES, CategoryId } from './categories';
 import { isValidNairaInput, parseNairaToKobo } from './money';
-import type { Direction, NewEntry } from './types';
+import type { Direction, Entry, NewEntry } from './types';
 
 const DIRECTIONS = [
   { value: 'income', label: 'Money in' },
@@ -19,29 +19,47 @@ const DIRECTIONS = [
 type Props = {
   // Must resolve only after the entry is really stored, and throw if it was not.
   onSave: (entry: NewEntry) => Promise<void>;
+  entry?: Entry | null;
 };
 
-export function EntryForm({ onSave }: Props) {
-  const [direction, setDirection] = useState<Direction>('expense');
-  const [amount, setAmount] = useState('');
-  const [label, setLabel] = useState('');
-  const [category, setCategory] = useState<CategoryId | null>(null);
-  const [date, setDate] = useState(todayString());
+export function EntryForm({ onSave, entry }: Props) {
+  const isEditing = entry !== null && entry !== undefined;
+  const [direction, setDirection] = useState<Direction>(entry?.direction ?? 'expense');
+  const [amount, setAmount] = useState(
+    entry ? (entry.amountKobo / 100).toFixed(2) : ''
+  );
+  const [label, setLabel] = useState(entry?.label ?? '');
+  const [category, setCategory] = useState<CategoryId | null>(entry?.category ?? null);
+  const [date, setDate] = useState(entry?.date ?? todayString());
   const [errors, setErrors] = useState({ amount: '', label: '', category: '' });
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
 
   const savingRef = useRef(false); // blocks a second tap before the screen re-renders
-  const pendingId = useRef(Crypto.randomUUID());
+  const pendingId = useRef(entry?.id ?? Crypto.randomUUID());
 
-  const resetForm = () => {
+  useEffect(() => {
+    if (entry) {
+      setDirection(entry.direction);
+      setAmount((entry.amountKobo / 100).toFixed(2));
+      setLabel(entry.label);
+      setCategory(entry.category);
+      setDate(entry.date);
+      pendingId.current = entry.id;
+      setErrors({ amount: '', label: '', category: '' });
+      setFormError('');
+      return;
+    }
+
     setDirection('expense');
     setAmount('');
     setLabel('');
     setCategory(null);
     setDate(todayString());
+    pendingId.current = Crypto.randomUUID();
     setErrors({ amount: '', label: '', category: '' });
-  };
+    setFormError('');
+  }, [entry]);
 
   const handleSave = async () => {
     if (savingRef.current) return;
@@ -63,16 +81,13 @@ export function EntryForm({ onSave }: Props) {
 
     try {
       await onSave({
-        id: pendingId.current,
+        id: isEditing ? entry!.id : pendingId.current,
         amountKobo,
         direction,
         label: label.trim(),
         date,
         category,
       });
-      // Only now is the entry stored. Start a fresh form with a fresh id.
-      pendingId.current = Crypto.randomUUID();
-      resetForm();
     } catch {
       // Keep everything the user typed so they can retry.
       setFormError('Not saved. Your entry is still here, so you can try again.');
@@ -142,8 +157,8 @@ export function EntryForm({ onSave }: Props) {
       <FormError message={formError} />
 
       <PrimaryButton
-        label="Save entry"
-        loadingLabel="Saving..."
+        label={isEditing ? 'Save changes' : 'Save entry'}
+        loadingLabel={isEditing ? 'Saving changes...' : 'Saving...'}
         loading={saving}
         onPress={handleSave}
       />

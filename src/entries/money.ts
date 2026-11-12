@@ -13,6 +13,17 @@ export function parseNairaToKobo(text: string): number | null {
   return Number.isSafeInteger(kobo) && kobo > 0 ? kobo : null;
 }
 
+// Converts whole-kobo values into the input-friendly text format the amount box accepts:
+// 500000 -> "5000.00", 5 -> "0.05", 10 -> "0.10".
+// This intentionally avoids formatNaira(): it adds commas and a special minus sign,
+// which the raw amount input rejects.
+export function koboToInputText(kobo: number): string {
+  const safe = Math.abs(Math.trunc(kobo));
+  const naira = Math.floor(safe / 100);
+  const rest = String(safe % 100).padStart(2, '0');
+  return `${naira}.${rest}`;
+}
+
 // 1500000 -> "15,000.00", -500000 -> "−5,000.00". Integer maths only, so no floating-point tail.
 // No ₦ symbol: add it where you display it.
 export function formatNaira(kobo: number): string {
