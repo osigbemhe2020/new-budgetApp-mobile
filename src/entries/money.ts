@@ -24,6 +24,20 @@ export function koboToInputText(kobo: number): string {
   return `${naira}.${rest}`;
 }
 
+// Keeps the same ordering the dashboard expects: newest date first, then newest record time.
+export function sortEntriesByDate<T extends { date: string; createdAt: number }>(items: T[]): T[] {
+  return [...items].sort((a, b) => {
+    const byDate = b.date.localeCompare(a.date);
+    return byDate !== 0 ? byDate : b.createdAt - a.createdAt;
+  });
+}
+
+// Works out the balance from the rows in a way that matches the SQL query: income adds,
+// expense subtracts. This is the same logic the UI uses to keep list and balance in step.
+export function calculateBalanceKobo<T extends { direction: 'income' | 'expense'; amountKobo: number }>(items: T[]): number {
+  return items.reduce((sum, item) => sum + (item.direction === 'income' ? item.amountKobo : -item.amountKobo), 0);
+}
+
 // 1500000 -> "15,000.00", -500000 -> "−5,000.00". Integer maths only, so no floating-point tail.
 // No ₦ symbol: add it where you display it.
 export function formatNaira(kobo: number): string {
