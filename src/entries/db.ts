@@ -68,6 +68,24 @@ export async function updateEntry(userId: string, id: string, e: EntryUpdate): P
   }
 }
 
+export async function deleteEntry(userId: string, id: string): Promise<void> {
+  const db = await getDb();
+  const result = await db.runAsync(
+    `DELETE FROM entries
+      WHERE id = ?
+        AND user_id = ?`,
+    id, userId
+  );
+
+  const removed = typeof (result as { changes?: number } | undefined)?.changes === 'number'
+    ? (result as { changes: number }).changes
+    : 0;
+
+  if (removed === 0) {
+    throw new Error('Entry not found or not deletable by this user');
+  }
+}
+
 // Resolves only after SQLite has committed the row. Throws on any failure.
 // A single INSERT is atomic, so no explicit transaction is needed.
 // INSERT OR IGNORE + a stable id means retrying the same entry cannot create a duplicate.
