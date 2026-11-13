@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   Alert,
   FlatList,
@@ -85,6 +85,12 @@ export function EntriesDashboard({ userId }: { userId: string }) {
   const [formOpen, setFormOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<Entry | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const deletingIdRef = useRef<string | null>(null);
+
+  const clearDeleting = () => {
+    deletingIdRef.current = null;
+    setDeletingId(null);
+  };
 
   const closeForm = () => {
     setFormOpen(false);
@@ -107,10 +113,11 @@ export function EntriesDashboard({ userId }: { userId: string }) {
               setFormOpen(true);
             }}
             onDelete={() => {
-              if (deletingId !== null) {
+              if (deletingIdRef.current !== null) {
                 return;
               }
 
+              deletingIdRef.current = item.id;
               setDeletingId(item.id);
               const signed = item.direction === 'income' ? item.amountKobo : -item.amountKobo;
 
@@ -122,7 +129,7 @@ export function EntriesDashboard({ userId }: { userId: string }) {
                     text: 'Cancel',
                     style: 'cancel',
                     onPress: () => {
-                      setDeletingId(null);
+                      clearDeleting();
                     },
                   },
                   {
@@ -135,11 +142,12 @@ export function EntriesDashboard({ userId }: { userId: string }) {
                       } catch {
                         Alert.alert('Not deleted', 'The entry is still here.');
                       } finally {
-                        setDeletingId(null);
+                        clearDeleting();
                       }
                     },
                   },
                 ],
+                { cancelable: false },
               );
             }}
           />
