@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { addEntry, getBalanceKobo, listRecentEntries } from './db';
+import { addEntry, deleteEntry, getBalanceKobo, listRecentEntries, updateEntry } from './db';
 import type { Entry, NewEntry } from './types';
 
 export function useEntries(userId: string | null) {
@@ -37,5 +37,28 @@ export function useEntries(userId: string | null) {
     [userId, refresh]
   );
 
-  return { entries, balanceKobo, loadError, refresh, save };
+  // Writes the update, then reloads the canonical list and balance from SQLite so they
+  // stay in sync without manually patching state.
+  const update = useCallback(
+    async (id: string, update: Pick<NewEntry, 'direction' | 'amountKobo' | 'label' | 'category' | 'date'>) => {
+      if (!userId) throw new Error('Not signed in');
+      await updateEntry(userId, id, update);
+      await refresh();
+    },
+    [userId, refresh]
+  );
+
+  // Deletes the row, then reloads the canonical list and balance from SQLite. If the
+  // delete fails, the row must remain visible; if the reload fails afterwards, we reuse
+  // the existing read-error notice instead of reporting a failed delete.
+  const remove = useCallback(
+    async (id: string) => {
+      if (!userId) throw new Error('Not signed in');
+      await deleteEntry(userId, id);
+      await refresh();
+    },
+    [userId, refresh]
+  );
+
+  return { entries, balanceKobo, loadError, refresh, save, update, remove };
 }
