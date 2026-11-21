@@ -19,29 +19,29 @@ export default function SignUpScreen() {
   const router = useRouter();
   const { signIn } = useSession();
 
-  const [fullName, setFullName] = useState('');
+  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [fieldErrors, setFieldErrors] = useState({
-    fullName: '',
+    username: '',
     email: '',
     password: '',
   });
   const [formError, setFormError] = useState('');
 
   const validateForm = () => {
-    const trimmedName = fullName.trim();
+    const trimmedUsername = username.trim();
     const trimmedEmail = email.trim();
     const nextErrors = {
-      fullName: '',
+      username: '',
       email: '',
       password: '',
     };
 
-    if (!trimmedName) {
-      nextErrors.fullName = 'Full name is required';
+    if (!trimmedUsername) {
+      nextErrors.username = 'Username is required';
     }
 
     if (!trimmedEmail) {
@@ -55,7 +55,7 @@ export default function SignUpScreen() {
     }
 
     setFieldErrors(nextErrors);
-    return !nextErrors.fullName && !nextErrors.email && !nextErrors.password;
+    return !nextErrors.username && !nextErrors.email && !nextErrors.password;
   };
 
   const handleSubmit = async () => {
@@ -77,7 +77,7 @@ export default function SignUpScreen() {
         },
         body: JSON.stringify({
           email: email.trim(),
-          name: fullName.trim(),
+          username: username.trim(),
           password,
         }),
         signal: controller.signal,
@@ -98,8 +98,6 @@ export default function SignUpScreen() {
           return;
         }
 
-        // Note: duplicate names return 500 Internal Server Error due to a backend defect
-        // (see docs/api/auth.md: Probe: signup, duplicate name)
         setFormError(backendMessage || 'Unable to create account');
         return;
       }
@@ -155,26 +153,26 @@ export default function SignUpScreen() {
           </View>
 
           <View style={styles.form}>
-            <Text style={styles.label}>Full Name</Text>
-            <View style={[styles.inputWrap, fieldErrors.fullName ? styles.inputWrapError : null]}>
+            <Text style={styles.label}>Username</Text>
+            <View style={[styles.inputWrap, fieldErrors.username ? styles.inputWrapError : null]}>
               <Text style={styles.inputIcon}>◔</Text>
               <TextInput
-                value={fullName}
+                value={username}
                 onChangeText={(text) => {
-                  setFullName(text);
-                  if (fieldErrors.fullName) {
-                    setFieldErrors((current) => ({ ...current, fullName: '' }));
+                  setUsername(text);
+                  if (fieldErrors.username) {
+                    setFieldErrors((current) => ({ ...current, username: '' }));
                   }
                   if (formError) setFormError('');
                 }}
-                placeholder="John Doe"
+                placeholder="johndoe"
                 placeholderTextColor="#6f7281"
-                autoCapitalize="words"
+                autoCapitalize="none"
                 style={styles.input}
                 editable={!isSubmitting}
               />
             </View>
-            {fieldErrors.fullName ? <Text style={styles.errorText}>{fieldErrors.fullName}</Text> : null}
+            {fieldErrors.username ? <Text style={styles.errorText}>{fieldErrors.username}</Text> : null}
 
             <Text style={styles.label}>Email address</Text>
             <View style={[styles.inputWrap, fieldErrors.email ? styles.inputWrapError : null]}>

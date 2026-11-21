@@ -30,8 +30,8 @@ export default function DashboardScreen() {
         <View style={styles.headerRow}>
           <View style={styles.greetingContainer}>
             <Text style={styles.greeting}>Welcome back</Text>
-            <Text style={styles.userName}>{session?.user?.FullName}</Text>
-            <Text style={styles.userEmail}>{session?.user?.Email}</Text>
+            <Text style={styles.userName}>{session?.user?.username}</Text>
+            <Text style={styles.userEmail}>{session?.user?.email}</Text>
           </View>
           <Pressable
             style={[styles.logoutButton, isLoggingOut && styles.logoutButtonDisabled]}

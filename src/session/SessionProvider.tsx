@@ -12,9 +12,9 @@ import * as SplashScreen from 'expo-splash-screen';
 import { jwtDecode } from 'jwt-decode';
 
 export type SessionUser = {
-  UserID: number | string;
-  FullName: string;
-  Email: string;
+  userId: number;
+  username: string;
+  email: string;
 };
 
 export type SessionData = {
