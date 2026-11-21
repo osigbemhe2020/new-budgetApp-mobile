@@ -1,8 +1,8 @@
 # 0005: End-to-end journey run
 
-Status: Run 2 complete (all 10 steps passed); a clean re-run was completed.
+Status: Run 1 complete (all 10 steps passed). No second run has been completed.
 Date run: 2026-11-21
-Run number: 2
+Run number: 1
 Results source: reported by the developer from on-device testing; not independently verified.
 
 ## Setup
@@ -37,7 +37,7 @@ Results source: reported by the developer from on-device testing; not independen
 | 2 | Ordering, fields, edit-updates-balance and delete-corrects-balance hold during the run | Met (labels New shoes and Test, categories Shopping and Salary, date edit from the 21st to the 22nd, reordering, amount edit, and balance correction were observed) |
 | 3 | Close/reopen and airplane mode show the same history and balance; adding works offline | Met (steps 7 to 9) |
 | 4 | Sign out and back in shows the same entries and balance | Met (step 10) |
-| 5 | No failed step, and the whole journey re-run twice cleanly | Met (runs 1 and 2) |
+| 5 | No failed step, and the whole journey re-run twice cleanly | Not met yet: only one run has been completed |
 #
 
 ## Limits of this run
@@ -46,5 +46,4 @@ Results source: reported by the developer from on-device testing; not independen
 
 ## Sign-off
 
-Signed off by: Paul  
-Date: 2026-11-21
+Not signed off. A second clean run of steps 1 to 10 is still outstanding.
