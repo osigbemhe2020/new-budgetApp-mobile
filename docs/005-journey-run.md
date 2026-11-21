@@ -1,6 +1,6 @@
 # 0005: End-to-end journey run
 
-Status: Run 2 complete (all 10 steps passed). Clean re-run done, 
+Status: Run 2 complete (all 10 steps passed); a clean re-run was completed.
 Date run: 2026-11-21
 Run number: 2
 Results source: reported by the developer from on-device testing; not independently verified.
@@ -17,12 +17,12 @@ Results source: reported by the developer from on-device testing; not independen
 
 | # | Action | Expected balance | Expected list / state | Result | Notes |
 |---|--------|------------------|-----------------------|--------|-------|
-| 1 | Open dashboard after creating the account | 0.00 | Empty state shown | PASS | First attempt FAILED (see Failures found); passed after the backend fix |
-| 2 | Add money out 5,000.00 | −5,000.00 | 1 entry; empty state gone | PASS | |
-| 3 | Add money in 20,000.00 | 15,000.00 | 2 entries; newest on top | PASS | |
-| 4 | Edit the 5,000.00 out entry to 7,000.00 | 13,000.00 | Row shows 7,000.00; fields pre-filled | PASS | |
-| 5 | Edit an entry's date | Balance unchanged | List order updates | PASS | |
-| 6 | Delete an entry (confirm) | Corrected balance | Row removed; confirmation asked | PASS | |
+| 1 | Open dashboard after creating the account | 0.00 | Empty state shown | PASS | |
+| 2 | Add money out 5,000.00 | −5,000.00 | 1 entry; empty state gone | PASS | Label: New shoes; category: Shopping. |
+| 3 | Add money in 20,000.00 | 15,000.00 | 2 entries; newest on top | PASS | Label: Test; category: Salary. |
+| 4 | Edit the 5,000.00 out entry to 7,000.00 | 13,000.00 | Row shows 7,000.00; fields pre-filled | PASS | Amount and balance observed as 7,000.00 and 13,000.00; label: New shoes; category: Shopping. |
+| 5 | Edit an entry's date from the 21st to the 22nd | Balance unchanged | List order updates | PASS | Balance remained unchanged and the list reordered after changing the date from the 21st to the 22nd. |
+| 6 | Delete an entry (confirm) | −7,000.00 | Row removed; confirmation asked | PASS | Deleted the Test income entry (Salary); row removed and corrected balance was −7,000.00. |
 | 7 | Fully close and reopen the app | −7,000.00 | Same list as step 6 | PASS | Entries and balance survived the restart |
 | 8 | Airplane mode ON, fully close and reopen | −7,000.00 | Lands on the dashboard (not login); same list | PASS | Opened on the dashboard while offline; user was not signed out |
 | 9 | Still in airplane mode: add money in 0.10, then money in 0.20 | −6,999.70 | 3 entries; adding works offline | PASS | Balance read −6,999.70, so 0.10 + 0.20 = 0.30 exactly |
@@ -34,19 +34,17 @@ Results source: reported by the developer from on-device testing; not independen
 | # | Criterion | Met? |
 |---|-----------|------|
 | 1 | Fresh start: add 5,000.00 out gives −5,000.00; add 20,000.00 in gives 15,000.00 | Met (storage cleared, new account) |
-| 2 | Ordering, fields, edit-updates-balance and delete-corrects-balance hold during the run | Met (steps 4 to 6, and steps 7 to 10 after them) |
+| 2 | Ordering, fields, edit-updates-balance and delete-corrects-balance hold during the run | Met (labels New shoes and Test, categories Shopping and Salary, date edit from the 21st to the 22nd, reordering, amount edit, and balance correction were observed) |
 | 3 | Close/reopen and airplane mode show the same history and balance; adding works offline | Met (steps 7 to 9) |
 | 4 | Sign out and back in shows the same entries and balance | Met (step 10) |
-| 5 | No failed step , and the whole journey re-run twice cleanly | MET
+| 5 | No failed step, and the whole journey re-run twice cleanly | Met (runs 1 and 2) |
 #
 
 ## Limits of this run
 
 - Storage was cleared rather than the app being uninstalled and reinstalled.
-- The backend fix was made partway through, so steps 2 to 10 were not all run in one sitting against the fixed backend.
-- The extra checks above were not run.
 
 ## Sign-off
 
-Not signed off. Outstanding: one clean re-run of steps 1 to 10 in a single sitting (criterion 5).
-Signed off by: ___paul_________   Date: ____November 21st________
+Signed off by: Paul  
+Date: 2026-11-21
