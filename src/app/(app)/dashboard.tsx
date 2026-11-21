@@ -8,13 +8,8 @@ import { colors } from '@/theme/tokens';
 export default function DashboardScreen() {
   const { session, signOut } = useSession();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-
-  // The backend capitalises its field names (FullName, Email), so the id may not be `id`.
-  // Run console.log(session?.user) once, then keep only the field that really holds the id.
-  // Never use the name or email as the id: they can change.
-  const user = session?.user as any;
-  const rawId = user?.id ?? user?.ID ?? user?.Id ?? user?.UserID;
-  const userId = rawId !== undefined && rawId !== null ? String(rawId) : null;
+  const user = session?.user;
+  const userId = user ? String(user.userId) : null;
 
   const handleLogout = async () => {
     if (isLoggingOut) return;
@@ -30,30 +25,12 @@ export default function DashboardScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.profileSection}>
-        <View style={styles.headerRow}>
-          <View style={styles.greetingContainer}>
-            <Text style={styles.greeting}>Welcome back</Text>
-            <Text style={styles.userName}>{session?.user?.username}</Text>
-            <Text style={styles.userEmail}>{session?.user?.email}</Text>
-          </View>
-          <Pressable
-            style={[styles.logoutButton, isLoggingOut && styles.logoutButtonDisabled]}
-            onPress={handleLogout}
-            disabled={isLoggingOut}
-          >
-            <Text style={styles.logoutButtonText}>
-              {isLoggingOut ? 'Logging out...' : 'Log Out'}
-            </Text>
-          </Pressable>
-        </View>
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
         <View style={styles.greetingContainer}>
           <Text style={styles.greeting}>Welcome back</Text>
-          <Text style={styles.userName}>{user?.FullName}</Text>
-          <Text style={styles.userEmail}>{user?.Email}</Text>
+          <Text style={styles.userName}>{user?.username}</Text>
+          <Text style={styles.userEmail}>{user?.email}</Text>
         </View>
         <Pressable
           accessibilityRole="button"

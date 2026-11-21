@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
-import { useSession } from '@/session/SessionProvider';
+import { useSession, type SessionUser } from '@/session/SessionProvider';
 import { AuthScreen } from '@/components/auth/AuthScreen';
 import { AuthCard } from '@/components/auth/AuthCard';
 import { AuthHeader } from '@/components/auth/AuthHeader';
@@ -15,6 +15,14 @@ import { isPasswordValid } from '@/utils/Passwordrules';
 const API_BASE_URL =
   process.env.EXPO_PUBLIC_API_BASE_URL || 'https://site--new-budgetapp-backend--vl2lrdxwsxyp.code.run';
 
+type SignupField = 'username' | 'email' | 'password' | 'confirmPassword';
+type SignupPayload = {
+  message?: unknown;
+  field?: unknown;
+  token?: unknown;
+  user?: SessionUser | null;
+};
+
 export default function SignUpScreen() {
   const router = useRouter();
   const { signIn } = useSession();
@@ -24,7 +32,7 @@ export default function SignUpScreen() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [fieldErrors, setFieldErrors] = useState({
+  const [fieldErrors, setFieldErrors] = useState<Record<SignupField, string>>({
     username: '',
     email: '',
     password: '',
@@ -32,18 +40,23 @@ export default function SignUpScreen() {
   });
   const [formError, setFormError] = useState('');
 
-  const clearField = (name: keyof typeof fieldErrors) => {
-    if (fieldErrors[name]) setFieldErrors((current) => ({ ...current, [name]: '' }));
-    if (formError) setFormError('');
+  const updateField = (field: SignupField, value: string) => {
+    if (field === 'username') setUsername(value);
+    if (field === 'email') setEmail(value);
+    if (field === 'password') setPassword(value);
+    if (field === 'confirmPassword') setConfirmPassword(value);
+    setFieldErrors((current) => ({ ...current, [field]: '' }));
+    setFormError('');
   };
 
   const validateForm = () => {
     const trimmedUsername = username.trim();
     const trimmedEmail = email.trim();
-    const nextErrors = {
+    const nextErrors: Record<SignupField, string> = {
       username: '',
       email: '',
       password: '',
+      confirmPassword: '',
     };
 
     if (!trimmedUsername) {
@@ -69,7 +82,7 @@ export default function SignUpScreen() {
     }
 
     setFieldErrors(nextErrors);
-    return !nextErrors.username && !nextErrors.email && !nextErrors.password;
+    return Object.values(nextErrors).every((error) => !error);
   };
 
   const handleSubmit = async () => {
@@ -84,9 +97,7 @@ export default function SignUpScreen() {
     try {
       const response = await fetch(`${API_BASE_URL}/auth/signup`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: email.trim(),
           username: username.trim(),
@@ -95,11 +106,11 @@ export default function SignUpScreen() {
         signal: controller.signal,
       });
 
-      clearTimeout(timeoutId);
-      const payload = await response.json().catch(() => ({}));
+      const payload: SignupPayload = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        const backendMessage = typeof payload?.message === 'string' ? payload.message : 'Unable to create account';
+        const backendMessage =
+          typeof payload.message === 'string' ? payload.message : 'Unable to create account';
 
         if (backendMessage === 'User already exists') {
           setFieldErrors((current) => ({
@@ -109,14 +120,28 @@ export default function SignUpScreen() {
           return;
         }
 
-        setFormError(backendMessage || 'Unable to create account');
+        const backendField = payload.field;
+        if (
+          backendField === 'username' ||
+          backendField === 'email' ||
+          backendField === 'password'
+        ) {
+          setFieldErrors((current) => ({
+            ...current,
+            [backendField]: backendMessage,
+          }));
+          return;
+        }
+
+        setFormError(backendMessage);
         return;
       }
 
-      const token = payload?.token;
-      if (!token) throw new Error('Missing token in signup response');
+      if (typeof payload.token !== 'string' || !payload.token) {
+        throw new Error('Missing token in signup response');
+      }
 
-      await signIn(token, payload?.user ?? null);
+      await signIn(payload.token, payload.user ?? null);
       router.replace('/(app)/dashboard');
     } catch (error) {
       if (error instanceof Error) {
@@ -137,105 +162,79 @@ export default function SignUpScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.screen}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollViewContent}
-        keyboardShouldPersistTaps="handled"
-      >
-        <View style={styles.card}>
-          <View style={styles.header}>
-            <View style={styles.logoRow}>
-              <View style={styles.logoBadge}>
-                <View style={styles.logoInner} />
-              </View>
-              <Text style={styles.logo}>BudgetWise</Text>
-            </View>
-
-            <Text style={styles.title}>Create account</Text>
-            <Text style={styles.subtitle}>Start building your financial identity</Text>
-          </View>
-
-          <View style={styles.form}>
-            <Text style={styles.label}>Username</Text>
-            <View style={[styles.inputWrap, fieldErrors.username ? styles.inputWrapError : null]}>
-              <Text style={styles.inputIcon}>◔</Text>
-              <TextInput
-                value={username}
-                onChangeText={(text) => {
-                  setUsername(text);
-                  if (fieldErrors.username) {
-                    setFieldErrors((current) => ({ ...current, username: '' }));
-                  }
-                  if (formError) setFormError('');
-                }}
-                placeholder="johndoe"
-                placeholderTextColor="#6f7281"
-                autoCapitalize="none"
-                style={styles.input}
-                editable={!isSubmitting}
-              />
-            </View>
-            {fieldErrors.username ? <Text style={styles.errorText}>{fieldErrors.username}</Text> : null}
-
-            <Text style={styles.label}>Email address</Text>
-            <View style={[styles.inputWrap, fieldErrors.email ? styles.inputWrapError : null]}>
-              <Text style={styles.inputIcon}>✉</Text>
-              <TextInput
-                value={email}
-                onChangeText={(text) => {
-                  setEmail(text);
-                  if (fieldErrors.email) {
-                    setFieldErrors((current) => ({ ...current, email: '' }));
-                  }
-                  if (formError) setFormError('');
-                }}
-                placeholder="you@example.com"
-                placeholderTextColor="#6f7281"
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoCorrect={false}
-                style={styles.input}
-                editable={!isSubmitting}
-              />
-            </View>
-            {fieldErrors.email ? <Text style={styles.errorText}>{fieldErrors.email}</Text> : null}
-
-            <Text style={styles.label}>Password</Text>
-            <View style={[styles.inputWrap, fieldErrors.password ? styles.inputWrapError : null]}>
-              <Text style={styles.inputIcon}>🔒</Text>
-              <TextInput
-                value={password}
-                onChangeText={(text) => {
-                  setPassword(text);
-                  if (fieldErrors.password) {
-                    setFieldErrors((current) => ({ ...current, password: '' }));
-                  }
-                  if (formError) setFormError('');
-                }}
-                placeholder="••••••••"
-                placeholderTextColor="#6f7281"
-                secureTextEntry={!showPassword}
-                autoCapitalize="none"
-                autoCorrect={false}
-                style={styles.input}
-                editable={!isSubmitting}
-              />
-
-        <FormError message={formError} />
-
-        <PrimaryButton
-          label="Create Account"
-          loadingLabel="Creating Account..."
-          loading={isSubmitting}
-          onPress={handleSubmit}
+    <AuthScreen>
+      <AuthCard tone="tinted">
+        <AuthHeader
+          title="Create account"
+          subtitle="Start building your financial identity"
+          logoTone="dark"
         />
 
+        <View style={styles.form}>
+          <FormField
+            label="Username"
+            icon="person-outline"
+            placeholder="johndoe"
+            value={username}
+            onChangeText={(text) => updateField('username', text)}
+            error={fieldErrors.username}
+            autoCapitalize="none"
+            autoCorrect={false}
+            editable={!isSubmitting}
+          />
+
+          <FormField
+            label="Email address"
+            icon="mail-outline"
+            placeholder="you@example.com"
+            value={email}
+            onChangeText={(text) => updateField('email', text)}
+            error={fieldErrors.email}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+            editable={!isSubmitting}
+          />
+
+          <View>
+            <FormField
+              label="Password"
+              icon="lock-closed-outline"
+              placeholder="Create a password"
+              value={password}
+              onChangeText={(text) => updateField('password', text)}
+              error={fieldErrors.password}
+              isPassword
+              autoCorrect={false}
+              editable={!isSubmitting}
+            />
+            <PasswordStrength password={password} />
+          </View>
+
+          <FormField
+            label="Confirm password"
+            icon="lock-closed-outline"
+            placeholder="Re-enter your password"
+            value={confirmPassword}
+            onChangeText={(text) => updateField('confirmPassword', text)}
+            error={fieldErrors.confirmPassword}
+            isPassword
+            autoCorrect={false}
+            editable={!isSubmitting}
+          />
+
+          <FormError message={formError} />
+
+          <PrimaryButton
+            label="Create Account"
+            loadingLabel="Creating Account..."
+            loading={isSubmitting}
+            onPress={handleSubmit}
+          />
+        </View>
+
         <AuthFooterLink
-          prefix="Already have account?"
+          prefix="Already have an account?"
           linkLabel="Sign in"
           onPress={() => router.push('/(auth)/login' as any)}
         />
@@ -245,5 +244,5 @@ export default function SignUpScreen() {
 }
 
 const styles = StyleSheet.create({
-  card: { paddingVertical: 32, paddingHorizontal: 16 },
+  form: { gap: 16 },
 });
